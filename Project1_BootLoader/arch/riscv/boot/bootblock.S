@@ -16,7 +16,11 @@ main:
 	// fence on all memory and I/O
 	fence
 
-	// TODO: [p1-task1] call BIOS to print string "It's bootblock!"
+	// call BIOS to print string "It's Boot Loader!"
+    li   a0, 9
+    lui  a1, %hi(msg)
+    addi a1, a1, %lo(msg)
+    call bios_func_entry
 
 
 	// TODO: [p1-task2] call BIOS to read kernel in SD card
@@ -35,5 +39,5 @@ stop:
 
 .data
 
-msg: .string "It's a bootloader...\n\r"
+msg: .string "It's Boot Loader!\n\r"
 
