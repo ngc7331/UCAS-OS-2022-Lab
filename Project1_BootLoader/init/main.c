@@ -50,7 +50,7 @@ int main(void) {
     init_task_info();
 
     // Output 'Hello OS!', bss check result and OS version
-    char output_str[] = "bss check: _ version: _\n\r";
+    char output_str[] = "[kernel] bss check: _ version: _\n\r";
     char output_val[2] = {0};
     int i, output_val_pos = 0;
 
@@ -63,19 +63,19 @@ int main(void) {
         }
     }
 
-    bios_putstr("Hello OS!\n\r");
+    bios_putstr("[kernel] Hello OS!\n\r");
     bios_putstr(buf);
 
     // TODO: [task3] interactive load & run apps
     int (*task)();
     for (int i=0; i<4; i++) {
-        bios_putstr("Loading user app#");
+        bios_putstr("[kernel] Loading user app#");
         bios_putchar(i + '0');
         bios_putstr("\n\r");
         task = load_task_img(i);
-        bios_putstr("Loaded, running\n\r");
+        bios_putstr("[kernel] Loaded, running\n\r");
         task();
-        bios_putstr("Finished\n\r");
+        bios_putstr("[kernel] Finished\n\r");
     }
 
     // input and echo

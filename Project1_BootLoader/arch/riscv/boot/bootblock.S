@@ -47,5 +47,5 @@ stop:
 
 .data
 
-msg: .string "It's Boot Loader!\n\r"
+msg: .string "[bootloader] It's Boot Loader!\n\r"
 
