@@ -8,7 +8,7 @@
 #include <os/utils.h>
 #include <type.h>
 
-#define BUFSIZE 50
+#define BUFSIZE 64
 #define TASK_NUM_LOC 0x502001fa
 
 int version = 2; // version must between 0 and 9
@@ -40,6 +40,9 @@ static void init_task_info(void) {
     // TODO: [p1-task4] Init 'tasks' array via reading app-info sector
     // NOTE: You need to get some related arguments from bootblock first
     tasknum = *((int *) TASK_NUM_LOC);
+    task_info_t *task = (task_info_t *) (TASK_NUM_LOC - sizeof(task_info_t) * tasknum);
+    for (short i=0; i<tasknum; i++, task++)
+        tasks[i] = *task;
 }
 
 int main(void) {
@@ -77,6 +80,9 @@ int main(void) {
         if (taskid >= 0 && taskid < tasknum) {
             char output_load_app[1] = {taskid + '0'};
             console_print("[kernel] I: Loading user app#_\n\r", output_load_app);
+            bios_putstr("[kernel] I: Taskname: ");
+            bios_putstr(tasks[taskid].name);
+            bios_putstr("\n\r");
 
             int (*task)() = (int (*)()) load_task_img(taskid);
             if (task == 0)

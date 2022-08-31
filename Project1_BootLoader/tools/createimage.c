@@ -20,9 +20,12 @@
 
 #define NBYTES2SEC(nbytes) (((nbytes) / SECTOR_SIZE) + ((nbytes) % SECTOR_SIZE != 0))
 
-/* TODO: [p1-task4] design your own task_info_t */
+// task_info_t
 typedef struct {
-
+    char name[32];
+    uint64_t entrypoint;
+    int size;
+    int phyaddr;
 } task_info_t;
 
 #define TASK_MAXNUM 16
@@ -78,7 +81,6 @@ int main(int argc, char **argv) {
     return 0;
 }
 
-/* TODO: [p1-task4] assign your task_info_t somewhere in 'create_image' */
 static void create_image(int nfiles, char *files[]) {
     int tasknum = nfiles - 2;
     int nbytes_kernel = 0;
@@ -97,6 +99,9 @@ static void create_image(int nfiles, char *files[]) {
         int taskidx = fidx - 2;
 
         task_info_t task;
+        strcpy(task.name, *files);
+        task.entrypoint = get_entrypoint(ehdr);
+        task.phyaddr = phyaddr;
 
         /* open input file */
         fp = fopen(*files, "r");
@@ -135,7 +140,9 @@ static void create_image(int nfiles, char *files[]) {
             write_padding(img, &phyaddr, (fidx*PADDING_SECTORS + 1) * SECTOR_SIZE);
         }
 
-        taskinfo[taskidx] = task;
+        task.size = phyaddr - task.phyaddr;
+        if (taskidx >= 0)  // skip bootblock & main
+            taskinfo[taskidx] = task;
 
         fclose(fp);
         files++;
@@ -212,22 +219,39 @@ static void write_padding(FILE *img, int *phyaddr, int new_phyaddr) {
 static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
                            short tasknum, FILE * img) {
     // write image info to some certain places
-    // NOTE: os size, information about app-info sector(s) ...
+    // os size, information about app-info sector(s) ...
+
+    /* FIXME: this mechanism may should be changed
+     * now img file is like : | bootblock taskinfos tasknum ossize | kernel | apps |
+     * it may should be like: | bootblock     taskinfo_addr ossize | kernel | apps | tasknum taskinfos |
+     * for short: taskinfos should be write to the end of img, taskinfo_addr points to it
+     * kernel should find them by taskinfo_addr, and load them by bios_sdread()
+     */
+
+    // write taskinfos to the end of img
+    // unsigned int taskinfos_phyaddr = ftell(img);
+    // the first 2 bytes are tasknum
+    // fputc(tasknum, img);
+    // fputc(tasknum >> 8, img);
 
     // write os size
     int nsecs_kern = NBYTES2SEC(nbytes_kern);
     printf("OS sectors: %d\n", nsecs_kern);
     fseek(img, OS_SIZE_LOC, SEEK_SET);
-    fputc(nsecs_kern, img);
+    fwrite(&nsecs_kern, sizeof(int), 1, img);
 
-    // write task num
-    printf("Task num: %d\n", tasknum);
+    // write task infos phyaddr
+    // printf("Task infos phyaddr: 0x%lx\n", taskinfos_phyaddr);
+    // fseek(img, TASK_INFO_P_LOC, SEEK_SET);
+    // fwrite(&taskinfos_phyaddr, sizeof(long), 1, img);
+
+    // FIXME: write tasknum
+    printf("Tasknum: %d\n", tasknum);
     fseek(img, TASK_NUM_LOC, SEEK_SET);
-    fputc(tasknum, img);
-    fputc(tasknum >> 8, img);
-
-    // TODO: [task4] write taskinfos
-
+    fwrite(&tasknum, sizeof(short), 1, img);
+    // FIXME: write task infos before tasknum
+    fseek(img, TASK_NUM_LOC - sizeof(task_info_t) * tasknum, SEEK_SET);
+    fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
 }
 
 /* print an error message and exit */
