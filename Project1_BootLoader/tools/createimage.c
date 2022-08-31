@@ -13,6 +13,8 @@
 #define SECTOR_SIZE 512
 #define BOOT_LOADER_SIG_OFFSET 0x1fe
 #define OS_SIZE_LOC (BOOT_LOADER_SIG_OFFSET - 2)
+#define TASK_NUM_LOC (OS_SIZE_LOC - 2)
+#define PADDING_SECTORS   16  // TODO: [task4] this should be deleted
 #define BOOT_LOADER_SIG_1 0x55
 #define BOOT_LOADER_SIG_2 0xaa
 
@@ -45,8 +47,7 @@ static void write_padding(FILE *img, int *phyaddr, int new_phyaddr);
 static void write_img_info(int nbytes_kernel, task_info_t *taskinfo,
                            short tasknum, FILE *img);
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     char *progname = argv[0];
 
     /* process command line options */
@@ -78,8 +79,7 @@ int main(int argc, char **argv)
 }
 
 /* TODO: [p1-task4] assign your task_info_t somewhere in 'create_image' */
-static void create_image(int nfiles, char *files[])
-{
+static void create_image(int nfiles, char *files[]) {
     int tasknum = nfiles - 2;
     int nbytes_kernel = 0;
     int phyaddr = 0;
@@ -119,15 +119,18 @@ static void create_image(int nfiles, char *files[])
             }
         }
 
-        /* write padding bytes */
-        /**
-         * TODO:
-         * 1. [p1-task3] do padding so that the kernel and every app program
-         *  occupies the same number of sectors
-         * 2. [p1-task4] only padding bootblock is allowed!
-         */
+        /* padding bootblock */
         if (strcmp(*files, "bootblock") == 0) {
             write_padding(img, &phyaddr, SECTOR_SIZE);
+        }
+        /*
+         * Do padding so that the kernel and every app program
+         * occupies the same number of sectors
+         * Padding to 16 sectors
+         */
+        // TODO: [task4] this should be deleted
+        else {
+            write_padding(img, &phyaddr, (fidx*PADDING_SECTORS + 1) * SECTOR_SIZE);
         }
 
         fclose(fp);
@@ -138,8 +141,7 @@ static void create_image(int nfiles, char *files[])
     fclose(img);
 }
 
-static void read_ehdr(Elf64_Ehdr * ehdr, FILE * fp)
-{
+static void read_ehdr(Elf64_Ehdr * ehdr, FILE * fp) {
     int ret;
 
     ret = fread(ehdr, sizeof(*ehdr), 1, fp);
@@ -150,8 +152,7 @@ static void read_ehdr(Elf64_Ehdr * ehdr, FILE * fp)
 }
 
 static void read_phdr(Elf64_Phdr * phdr, FILE * fp, int ph,
-                      Elf64_Ehdr ehdr)
-{
+                      Elf64_Ehdr ehdr) {
     int ret;
 
     fseek(fp, ehdr.e_phoff + ph * ehdr.e_phentsize, SEEK_SET);
@@ -166,23 +167,19 @@ static void read_phdr(Elf64_Phdr * phdr, FILE * fp, int ph,
     }
 }
 
-static uint64_t get_entrypoint(Elf64_Ehdr ehdr)
-{
+static uint64_t get_entrypoint(Elf64_Ehdr ehdr) {
     return ehdr.e_entry;
 }
 
-static uint32_t get_filesz(Elf64_Phdr phdr)
-{
+static uint32_t get_filesz(Elf64_Phdr phdr) {
     return phdr.p_filesz;
 }
 
-static uint32_t get_memsz(Elf64_Phdr phdr)
-{
+static uint32_t get_memsz(Elf64_Phdr phdr) {
     return phdr.p_memsz;
 }
 
-static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr)
-{
+static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr) {
     if (phdr.p_memsz != 0 && phdr.p_type == PT_LOAD) {
         /* write the segment itself */
         /* NOTE: expansion of .bss should be done by kernel or runtime env! */
@@ -197,8 +194,7 @@ static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr)
     }
 }
 
-static void write_padding(FILE *img, int *phyaddr, int new_phyaddr)
-{
+static void write_padding(FILE *img, int *phyaddr, int new_phyaddr) {
     if (options.extended == 1 && *phyaddr < new_phyaddr) {
         printf("\t\twrite 0x%04lx bytes for padding\n", new_phyaddr - *phyaddr);
     }
@@ -210,15 +206,28 @@ static void write_padding(FILE *img, int *phyaddr, int new_phyaddr)
 }
 
 static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
-                           short tasknum, FILE * img)
-{
-    // TODO: [p1-task3] & [p1-task4] write image info to some certain places
-    // NOTE: os size, infomation about app-info sector(s) ...
+                           short tasknum, FILE * img) {
+    // write image info to some certain places
+    // NOTE: os size, information about app-info sector(s) ...
+
+    // write os size
+    int nsecs_kern = NBYTES2SEC(nbytes_kern);
+    printf("OS sectors: %d\n", nsecs_kern);
+    fseek(img, OS_SIZE_LOC, SEEK_SET);
+    fputc(nsecs_kern, img);
+
+    // write task num
+    printf("Task num: %d\n", tasknum);
+    fseek(img, TASK_NUM_LOC, SEEK_SET);
+    fputc(tasknum, img);
+    fputc(tasknum >> 8, img);
+
+    // TODO: [task4] write taskinfos
+
 }
 
 /* print an error message and exit */
-static void error(char *fmt, ...)
-{
+static void error(char *fmt, ...) {
     va_list args;
 
     va_start(args, fmt);

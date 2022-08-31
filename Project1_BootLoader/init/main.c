@@ -14,8 +14,7 @@ char buf[VERSION_BUF];
 // Task info array
 task_info_t tasks[TASK_MAXNUM];
 
-static int bss_check(void)
-{
+static int bss_check(void) {
     for (int i = 0; i < VERSION_BUF; ++i)
     {
         if (buf[i] != 0)
@@ -26,8 +25,7 @@ static int bss_check(void)
     return 1;
 }
 
-static void init_bios(void)
-{
+static void init_bios(void) {
     volatile long (*(*jmptab))() = (volatile long (*(*))())BIOS_JMPTAB_BASE;
 
     jmptab[CONSOLE_PUTSTR]  = (long (*)())port_write;
@@ -36,14 +34,12 @@ static void init_bios(void)
     jmptab[SD_READ]         = (long (*)())sd_read;
 }
 
-static void init_task_info(void)
-{
+static void init_task_info(void) {
     // TODO: [p1-task4] Init 'tasks' array via reading app-info sector
     // NOTE: You need to get some related arguments from bootblock first
 }
 
-int main(void)
-{
+int main(void) {
     // Check whether .bss section is set to zero
     int check = bss_check();
 
@@ -60,11 +56,9 @@ int main(void)
 
     output_val[0] = check ? 't' : 'f';
     output_val[1] = version + '0';
-    for (i = 0; i < sizeof(output_str); ++i)
-    {
+    for (i = 0; i < sizeof(output_str); ++i) {
         buf[i] = output_str[i];
-        if (buf[i] == '_')
-        {
+        if (buf[i] == '_') {
             buf[i] = output_val[output_val_pos++];
         }
     }
@@ -72,10 +66,21 @@ int main(void)
     bios_putstr("Hello OS!\n\r");
     bios_putstr(buf);
 
+    // TODO: [task3] interactive load & run apps
+    int (*task)();
+    for (int i=0; i<4; i++) {
+        bios_putstr("Loading user app#");
+        bios_putchar(i + '0');
+        bios_putstr("\n\r");
+        task = load_task_img(i);
+        bios_putstr("Loaded, running\n\r");
+        task();
+        bios_putstr("Finished\n\r");
+    }
+
     // input and echo
     int ch;
-    while (1)
-    {
+    while (1) {
         ch = bios_getchar();
         switch (ch)
         {
@@ -94,8 +99,7 @@ int main(void)
 
 
     // Infinite while loop, where CPU stays in a low-power state (QAQQQQQQQQQQQ)
-    while (1)
-    {
+    while (1) {
         asm volatile("wfi");
     }
 
