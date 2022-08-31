@@ -96,6 +96,8 @@ static void create_image(int nfiles, char *files[]) {
 
         int taskidx = fidx - 2;
 
+        task_info_t task;
+
         /* open input file */
         fp = fopen(*files, "r");
         assert(fp != NULL);
@@ -132,6 +134,8 @@ static void create_image(int nfiles, char *files[]) {
         else {
             write_padding(img, &phyaddr, (fidx*PADDING_SECTORS + 1) * SECTOR_SIZE);
         }
+
+        taskinfo[taskidx] = task;
 
         fclose(fp);
         files++;
@@ -196,7 +200,7 @@ static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr) {
 
 static void write_padding(FILE *img, int *phyaddr, int new_phyaddr) {
     if (options.extended == 1 && *phyaddr < new_phyaddr) {
-        printf("\t\twrite 0x%04lx bytes for padding\n", new_phyaddr - *phyaddr);
+        printf("\t\twrite 0x%04x bytes for padding\n", new_phyaddr - *phyaddr);
     }
 
     while (*phyaddr < new_phyaddr) {

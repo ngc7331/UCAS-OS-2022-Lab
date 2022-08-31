@@ -14,14 +14,13 @@
 int version = 2; // version must between 0 and 9
 char buf[BUFSIZE];
 
+short tasknum;
 // Task info array
 task_info_t tasks[TASK_MAXNUM];
 
 static int bss_check(void) {
-    for (int i = 0; i < BUFSIZE; ++i)
-    {
-        if (buf[i] != 0)
-        {
+    for (int i = 0; i < BUFSIZE; ++i) {
+        if (buf[i] != 0) {
             return 0;
         }
     }
@@ -40,6 +39,7 @@ static void init_bios(void) {
 static void init_task_info(void) {
     // TODO: [p1-task4] Init 'tasks' array via reading app-info sector
     // NOTE: You need to get some related arguments from bootblock first
+    tasknum = *((int *) TASK_NUM_LOC);
 }
 
 int main(void) {
@@ -53,51 +53,46 @@ int main(void) {
     init_task_info();
 
     // Output 'Hello OS!', bss check result and OS version
-    char output_str[] = "[kernel] bss check: _ version: _\n\r";
-    char output_val[2] = {0};
-    int i, output_val_pos = 0;
-
-    output_val[0] = check ? 't' : 'f';
-    output_val[1] = version + '0';
-    for (i = 0; i < sizeof(output_str); ++i) {
-        buf[i] = output_str[i];
-        if (buf[i] == '_') {
-            buf[i] = output_val[output_val_pos++];
-        }
-    }
-
     bios_putstr("[kernel] Hello OS!\n\r");
-    bios_putstr(buf);
 
-    short tasknum = *((int *) TASK_NUM_LOC);
-    bios_putstr("[kernel] tasknum: ");
-    bios_putchar(tasknum / 10 % 10 + '0');
-    bios_putchar(tasknum % 10 + '0');
-    bios_putstr("\n\r");
+    char output_bss_check_val[2] = {
+        check ? 't' : 'f',
+        version + '0'
+    };
+    console_print("[kernel] I: bss check=_, version=_\n\r", output_bss_check_val);
+
+    char output_tasknum_val[2] = {
+        tasknum / 10 % 10 + '0',
+        tasknum % 10 + '0'
+    };
+    console_print("[kernel] I: tasknum: __\n\r", output_tasknum_val);
 
     // TODO: Load tasks by task name [p1-task4] and then execute them.
     while (1) {
         bios_putstr("[kernel] Input task id: ");
+
         int len = console_getline(buf, BUFSIZE);
         int taskid = atoi(buf, len);
+
         if (taskid >= 0 && taskid < tasknum) {
-            bios_putstr("[kernel] Loading user app#");
-            bios_putchar(taskid + '0');
-            bios_putstr("\n\r");
-            int (*task)() = load_task_img(taskid);
+            char output_load_app[1] = {taskid + '0'};
+            console_print("[kernel] I: Loading user app#_\n\r", output_load_app);
+
+            int (*task)() = (int (*)()) load_task_img(taskid);
             if (task == 0)
-                bios_putstr("[kernel] Error: Load error, abort\n\r");
+                bios_putstr("[kernel] E: Load error, abort\n\r");
             else {
-                bios_putstr("[kernel] Loaded, running\n\r");
+                bios_putstr("[kernel] I: Loaded, running\n\r");
                 task();
-                bios_putstr("[kernel] Finished\n\r");
+                bios_putstr("[kernel] I: Finished\n\r");
             }
         }
         else {
-            bios_putstr("[kernel] Error: task id out of range: (0, ");
-            bios_putchar((tasknum-1) / 10 % 10 + '0');
-            bios_putchar((tasknum-1) % 10 + '0');
-            bios_putstr(")\n\r");
+            char output_load_err[2] = {
+                (tasknum-1) / 10 % 10 + '0',
+                (tasknum-1) % 10 + '0'
+            };
+            console_print("[kernel] E: task id out of range: (0, __)\n\r", output_load_err);
         }
     }
 
