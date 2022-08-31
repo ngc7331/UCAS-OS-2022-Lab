@@ -1,22 +1,24 @@
-#include <common.h>
 #include <asm.h>
+#include <common.h>
 #include <os/bios.h>
-#include <os/task.h>
-#include <os/string.h>
+#include <os/console.h>
 #include <os/loader.h>
+#include <os/string.h>
+#include <os/task.h>
+#include <os/utils.h>
 #include <type.h>
 
-#define VERSION_BUF 50
+#define BUFSIZE 50
 #define TASK_NUM_LOC 0x502001fa
 
 int version = 2; // version must between 0 and 9
-char buf[VERSION_BUF];
+char buf[BUFSIZE];
 
 // Task info array
 task_info_t tasks[TASK_MAXNUM];
 
 static int bss_check(void) {
-    for (int i = 0; i < VERSION_BUF; ++i)
+    for (int i = 0; i < BUFSIZE; ++i)
     {
         if (buf[i] != 0)
         {
@@ -73,42 +75,31 @@ int main(void) {
     bios_putchar(tasknum % 10 + '0');
     bios_putstr("\n\r");
 
-    // TODO: [task3] interactive load & run apps
-    int (*task)();
-    for (int i=0; i<tasknum; i++) {
-        bios_putstr("[kernel] Loading user app#");
-        bios_putchar(i + '0');
-        bios_putstr("\n\r");
-        task = load_task_img(i);
-        if (task == 0)
-            bios_putstr("[kernel] load error, abort\n\r");
-        else {
-            bios_putstr("[kernel] Loaded, running\n\r");
-            task();
-            bios_putstr("[kernel] Finished\n\r");
-        }
-    }
-    bios_putstr("[kernel] All tasks finished\n\r");
-
-    // input and echo
-    int ch;
+    // TODO: Load tasks by task name [p1-task4] and then execute them.
     while (1) {
-        ch = bios_getchar();
-        switch (ch)
-        {
-        case -1:
-            continue;
-        case '\n': case '\r':
+        bios_putstr("[kernel] Input task id: ");
+        int len = console_getline(buf, BUFSIZE);
+        int taskid = atoi(buf, len);
+        if (taskid >= 0 && taskid < tasknum) {
+            bios_putstr("[kernel] Loading user app#");
+            bios_putchar(taskid + '0');
             bios_putstr("\n\r");
-            break;
-        default:
-            bios_putchar(ch);
+            int (*task)() = load_task_img(taskid);
+            if (task == 0)
+                bios_putstr("[kernel] Error: Load error, abort\n\r");
+            else {
+                bios_putstr("[kernel] Loaded, running\n\r");
+                task();
+                bios_putstr("[kernel] Finished\n\r");
+            }
+        }
+        else {
+            bios_putstr("[kernel] Error: task id out of range: (0, ");
+            bios_putchar((tasknum-1) / 10 % 10 + '0');
+            bios_putchar((tasknum-1) % 10 + '0');
+            bios_putstr(")\n\r");
         }
     }
-
-    // TODO: Load tasks by either task id [p1-task3] or task name [p1-task4],
-    //   and then execute them.
-
 
     // Infinite while loop, where CPU stays in a low-power state (QAQQQQQQQQQQQ)
     while (1) {
