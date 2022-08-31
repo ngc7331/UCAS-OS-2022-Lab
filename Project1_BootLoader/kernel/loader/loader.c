@@ -11,7 +11,9 @@ uint64_t load_task_img(int taskid) {
     // load task by id
     unsigned int mem_addr = TASK_MEM_BASE + taskid * TASK_SIZE;
     unsigned int block_id = 1 + (taskid + 1) * PADDING_SECTORS;
-    bios_sdread(mem_addr, PADDING_SECTORS, block_id);
+
+    if (bios_sdread(mem_addr, PADDING_SECTORS, block_id) != 0)
+        return 0;
 
     return mem_addr;
 }

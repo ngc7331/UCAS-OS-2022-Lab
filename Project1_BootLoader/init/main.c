@@ -7,6 +7,7 @@
 #include <type.h>
 
 #define VERSION_BUF 50
+#define TASK_NUM_LOC 0x502001fa
 
 int version = 2; // version must between 0 and 9
 char buf[VERSION_BUF];
@@ -66,17 +67,28 @@ int main(void) {
     bios_putstr("[kernel] Hello OS!\n\r");
     bios_putstr(buf);
 
+    short tasknum = *((int *) TASK_NUM_LOC);
+    bios_putstr("[kernel] tasknum: ");
+    bios_putchar(tasknum / 10 % 10 + '0');
+    bios_putchar(tasknum % 10 + '0');
+    bios_putstr("\n\r");
+
     // TODO: [task3] interactive load & run apps
     int (*task)();
-    for (int i=0; i<4; i++) {
+    for (int i=0; i<tasknum; i++) {
         bios_putstr("[kernel] Loading user app#");
         bios_putchar(i + '0');
         bios_putstr("\n\r");
         task = load_task_img(i);
-        bios_putstr("[kernel] Loaded, running\n\r");
-        task();
-        bios_putstr("[kernel] Finished\n\r");
+        if (task == 0)
+            bios_putstr("[kernel] load error, abort\n\r");
+        else {
+            bios_putstr("[kernel] Loaded, running\n\r");
+            task();
+            bios_putstr("[kernel] Finished\n\r");
+        }
     }
+    bios_putstr("[kernel] All tasks finished\n\r");
 
     // input and echo
     int ch;
