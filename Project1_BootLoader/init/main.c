@@ -36,8 +36,16 @@ static void init_bios(void) {
     jmptab[SD_READ]         = (long (*)())sd_read;
 }
 
+static void print_help(void) {
+    bios_putstr("[kernel] App list:\n\r");
+    for (int i=0; i<tasknum; i++) {
+        console_print("\t________________________________\n\r", tasks[i].name);
+    }
+}
+
 static void init_task_info(void) {
-    // TODO: [p1-task4] Init 'tasks' array via reading app-info sector
+    // Init 'tasks' array via reading app-info sector
+    // FIXME: See tools/createimage.c L#225
     // NOTE: You need to get some related arguments from bootblock first
     tasknum = *((int *) TASK_NUM_LOC);
     task_info_t *task = (task_info_t *) (TASK_NUM_LOC - sizeof(task_info_t) * tasknum);
@@ -58,47 +66,43 @@ int main(void) {
     // Output 'Hello OS!', bss check result and OS version
     bios_putstr("[kernel] Hello OS!\n\r");
 
-    char output_bss_check_val[2] = {
+    char output_bss_check_val[3] = {
         check ? 't' : 'f',
-        version + '0'
+        version + '0', '\0'
     };
     console_print("[kernel] I: bss check=_, version=_\n\r", output_bss_check_val);
 
-    char output_tasknum_val[2] = {
+    char output_tasknum_val[3] = {
         tasknum / 10 % 10 + '0',
-        tasknum % 10 + '0'
+        tasknum % 10 + '0', '\0'
     };
     console_print("[kernel] I: tasknum: __\n\r", output_tasknum_val);
 
-    // TODO: Load tasks by task name [p1-task4] and then execute them.
+    // Load tasks by task name and then execute them.
     while (1) {
-        bios_putstr("[kernel] Input task id: ");
+        bios_putstr("> ");
 
-        int len = console_getline(buf, BUFSIZE);
-        int taskid = atoi(buf, len);
-
-        if (taskid >= 0 && taskid < tasknum) {
-            char output_load_app[1] = {taskid + '0'};
-            console_print("[kernel] I: Loading user app#_\n\r", output_load_app);
-            bios_putstr("[kernel] I: Taskname: ");
-            bios_putstr(tasks[taskid].name);
-            bios_putstr("\n\r");
-
-            int (*task)() = (int (*)()) load_task_img(taskid);
-            if (task == 0)
-                bios_putstr("[kernel] E: Load error, abort\n\r");
-            else {
-                bios_putstr("[kernel] I: Loaded, running\n\r");
-                task();
-                bios_putstr("[kernel] I: Finished\n\r");
-            }
+        console_getline(buf, BUFSIZE);
+        if (strcmp(buf, "help") == 0) {
+            print_help();
+            continue;
         }
+
+        int taskid = get_taskid_by_name(buf);
+        if (taskid < 0) {
+            console_print("[kernel] E: no such app: ________________________________\n\r", buf);
+            continue;
+        }
+
+        console_print("[kernel] I: Loading user app: ________________________________...", tasks[taskid].name);
+
+        int (*task)() = (int (*)()) load_task_img(taskid);
+        if (task == 0)
+            bios_putstr(" error, abort\n\r");
         else {
-            char output_load_err[2] = {
-                (tasknum-1) / 10 % 10 + '0',
-                (tasknum-1) % 10 + '0'
-            };
-            console_print("[kernel] E: task id out of range: (0, __)\n\r", output_load_err);
+            bios_putstr(" loaded, running\n\r");
+            task();
+            bios_putstr("[kernel] I: Finished\n\r");
         }
     }
 

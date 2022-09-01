@@ -93,40 +93,41 @@ static void create_image(int nfiles, char *files[]) {
     img = fopen(IMAGE_FILE, "w");
     assert(img != NULL);
 
-    /* for each input file */
+    // for each input file
     for (int fidx = 0; fidx < nfiles; ++fidx) {
 
         int taskidx = fidx - 2;
 
+        // open input file
+        fp = fopen(*files, "r");
+        assert(fp != NULL);
+
+        // read ELF header
+        read_ehdr(&ehdr, fp);
+        printf("0x%04lx: %s\n", ehdr.e_entry, *files);
+
+        // create taskinfo
         task_info_t task;
         strcpy(task.name, *files);
         task.entrypoint = get_entrypoint(ehdr);
         task.phyaddr = phyaddr;
 
-        /* open input file */
-        fp = fopen(*files, "r");
-        assert(fp != NULL);
-
-        /* read ELF header */
-        read_ehdr(&ehdr, fp);
-        printf("0x%04lx: %s\n", ehdr.e_entry, *files);
-
-        /* for each program header */
+        // for each program header
         for (int ph = 0; ph < ehdr.e_phnum; ph++) {
 
-            /* read program header */
+            // read program header
             read_phdr(&phdr, fp, ph, ehdr);
 
-            /* write segment to the image */
+            // write segment to the image
             write_segment(phdr, fp, img, &phyaddr);
 
-            /* update nbytes_kernel */
+            // update nbytes_kernel
             if (strcmp(*files, "main") == 0) {
                 nbytes_kernel += get_filesz(phdr);
             }
         }
 
-        /* padding bootblock */
+        // padding bootblock
         if (strcmp(*files, "bootblock") == 0) {
             write_padding(img, &phyaddr, SECTOR_SIZE);
         }

@@ -8,7 +8,7 @@
 char console_getchar(void);
 char console_parsechar(int enable_backspace);
 int console_getline(char buf[], int bufsize);
-void str_format(char *fmt, char *buf, int len, char *val);
+int str_format(char *fmt, char *buf, int len, char *val);
 void console_print(char *fmt, char *val);
 
 #endif

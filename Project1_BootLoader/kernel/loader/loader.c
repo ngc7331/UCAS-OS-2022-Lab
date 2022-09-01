@@ -4,14 +4,14 @@
 #include <type.h>
 
 #define PADDING_SECTORS   16  // TODO: [task4] this should be deleted
+#define SECTOR_SIZE 512
 
 uint64_t load_task_img(int taskid) {
-    // TODO: [p1-task4] load task via task name, thus the arg should be 'char *taskname'
+    // load task via taskid, which is converted by kernel
+    unsigned int mem_addr = tasks[taskid].entrypoint;
+    unsigned int block_id = tasks[taskid].phyaddr / SECTOR_SIZE;
 
-    // load task by id
-    unsigned int mem_addr = TASK_MEM_BASE + taskid * TASK_SIZE;
-    unsigned int block_id = 1 + (taskid + 1) * PADDING_SECTORS;
-
+    // TODO: [task4] load without padding
     if (bios_sdread(mem_addr, PADDING_SECTORS, block_id) != 0)
         return 0;
 
