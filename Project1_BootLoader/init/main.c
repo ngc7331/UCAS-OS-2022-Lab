@@ -66,17 +66,13 @@ int main(void) {
     // Output 'Hello OS!', bss check result and OS version
     bios_putstr("[kernel] Hello OS!\n\r");
 
-    char output_bss_check_val[3] = {
-        check ? 't' : 'f',
-        version + '0', '\0'
-    };
-    console_print("[kernel] I: bss check=_, version=_\n\r", output_bss_check_val);
+    buf[0] = check ? 't' : 'f';
+    buf[1] = version + '0';
+    buf[2] = '\0';
+    console_print("[kernel] I: bss check=_, version=_\n\r", buf);
 
-    char output_tasknum_val[3] = {
-        tasknum / 10 % 10 + '0',
-        tasknum % 10 + '0', '\0'
-    };
-    console_print("[kernel] I: tasknum: __\n\r", output_tasknum_val);
+    itoa(tasknum, 10, buf, BUFSIZE, 0);
+    console_print("[kernel] D: tasknum=__\n\r", buf);
 
     // Load tasks by task name and then execute them.
     while (1) {
@@ -93,6 +89,14 @@ int main(void) {
             console_print("[kernel] E: no such app: ________________________________\n\r", buf);
             continue;
         }
+
+        // TEST
+        itoa(taskid, 10, buf, BUFSIZE, 0);
+        console_print("[kernel] D: taskid=__,", buf);
+        itoa(tasks[taskid].entrypoint, 16, buf, BUFSIZE, 8);
+        console_print(" entrypoint=__________", buf);
+        itoa(tasks[taskid].phyaddr, 16, buf, BUFSIZE, 8);
+        console_print(" phyaddr=__________\n\r", buf);
 
         console_print("[kernel] I: Loading user app: ________________________________...", tasks[taskid].name);
 
