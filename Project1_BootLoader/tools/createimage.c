@@ -14,7 +14,6 @@
 #define BOOT_LOADER_SIG_OFFSET 0x1fe
 #define OS_SIZE_LOC (BOOT_LOADER_SIG_OFFSET - 2)
 #define TASK_NUM_LOC (OS_SIZE_LOC - 2)
-#define PADDING_SECTORS   16  // TODO: [task4] this should be deleted
 #define BOOT_LOADER_SIG_1 0x55
 #define BOOT_LOADER_SIG_2 0xaa
 
@@ -130,15 +129,6 @@ static void create_image(int nfiles, char *files[]) {
         // padding bootblock
         if (strcmp(*files, "bootblock") == 0) {
             write_padding(img, &phyaddr, SECTOR_SIZE);
-        }
-        /*
-         * Do padding so that the kernel and every app program
-         * occupies the same number of sectors
-         * Padding to 16 sectors
-         */
-        // TODO: [task4] this should be deleted
-        else {
-            write_padding(img, &phyaddr, (fidx*PADDING_SECTORS + 1) * SECTOR_SIZE);
         }
 
         task.size = phyaddr - task.phyaddr;

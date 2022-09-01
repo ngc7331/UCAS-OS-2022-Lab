@@ -32,13 +32,8 @@ main:
 	li   a3, 1
 	call bios_func_entry
 
-
-	// TODO: [p1-task4] load task-related arguments and pass them to kernel
-
-
 	// jump to kernel to start UCAS-OS
 	j    kernel
-
 
 // while(1) --> stop here
 stop:

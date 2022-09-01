@@ -94,9 +94,11 @@ int main(void) {
         itoa(taskid, 10, buf, BUFSIZE, 0);
         console_print("[kernel] D: taskid=__,", buf);
         itoa(tasks[taskid].entrypoint, 16, buf, BUFSIZE, 8);
-        console_print(" entrypoint=__________", buf);
+        console_print(" entrypoint=__________,", buf);
         itoa(tasks[taskid].phyaddr, 16, buf, BUFSIZE, 8);
-        console_print(" phyaddr=__________\n\r", buf);
+        console_print(" phyaddr=__________,", buf);
+        itoa(tasks[taskid].size, 16, buf, BUFSIZE, 8);
+        console_print(" size=__________\n\r", buf);
 
         console_print("[kernel] I: Loading user app: ________________________________...", tasks[taskid].name);
 

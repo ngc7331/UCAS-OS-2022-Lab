@@ -1,7 +1,6 @@
 #include <asm.h>
 
 ENTRY(_start)
-
     // setup C runtime environment for the user program
     // push return address
     addi sp, sp, -8
