@@ -66,10 +66,17 @@ static void init_batch_info(void) {
 }
 
 static void print_help(void) {
-    bios_putstr("[kernel] App list:\n\r");
-    for (int i=0; i<tasknum; i++) {
-        console_print("\t________________________________\n\r", tasks[i].name);
-    }
+    bios_putstr("[kernel] I: === HELP START ===\n\r");
+
+    bios_putstr("  App list: (use \"<name>\" to execute)\n\r");
+    for (int i=0; i<tasknum; i++)
+        console_print("    - ________________________________\n\r", tasks[i].name);
+
+    bios_putstr("  Batch list: (use \"batch <name>\" to execute)\n\r");
+    for (int i=0; i<batchnum; i++)
+        console_print("    - ________________________________\n\r", batchs[i].name);
+
+    bios_putstr("[kernel] I: ==== HELP END ====\n\r");
 }
 
 int main(void) {
@@ -97,17 +104,9 @@ int main(void) {
     console_print("[kernel] D: tasknum=__\n\r", buf);
 
     // execute batch(s)
-    for (int i=0; i<batchnum; i++) {
-        if(batchs[i].execute_on_load) {
-            console_print("[kernel] I: ===== executing batch: "
-                          "________________________________"
-                          " =====\n\r", batchs[i].name);
+    for (int i=0; i<batchnum; i++)
+        if(batchs[i].execute_on_load)
             batch_execute(i);
-            console_print("[kernel] I: ===== completed batch: "
-                          "________________________________"
-                          " =====\n\r", batchs[i].name);
-        }
-    }
 
     // Load tasks by task name and then execute them.
     while (1) {
@@ -116,6 +115,14 @@ int main(void) {
         console_getline(buf, BUFSIZE);
         if (strcmp(buf, "help") == 0) {
             print_help();
+            continue;
+        }
+        if (strncmp(buf, "batch ", 5) == 0) {
+            int batchid = get_batchid_by_name(buf+6);
+            if (batchid < 0)
+                console_print("[kernel] E: no such batch: ________________________________\n\r", buf+6);
+            else
+                batch_execute(batchid);
             continue;
         }
 

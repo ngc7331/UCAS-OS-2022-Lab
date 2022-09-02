@@ -1,5 +1,4 @@
-bss
 auipc
-data
+bss
 data
 auipc

@@ -21,5 +21,6 @@ extern batch_info_t batchs[BATCH_MAXNUM];
 extern short batchnum;
 
 int batch_execute(int batchid);
+int get_batchid_by_name(char *name);
 
 #endif

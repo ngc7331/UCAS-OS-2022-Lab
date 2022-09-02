@@ -8,7 +8,8 @@
 #include <elf.h>
 
 #define IMAGE_FILE "./image"
-#define BATCH_FILE "test.bat"
+#define BATCH_FILE_0 "autorun.bat"
+#define BATCH_FILE_1 "manual.bat"
 #define ARGS "[--extended] [--vm] <bootblock> <executable-file> ..."
 
 #define SECTOR_SIZE 512
@@ -159,10 +160,10 @@ static void create_image(int nfiles, char *files[]) {
     write_img_info(nbytes_kernel, taskinfo, tasknum, img);
 
     // TEST: write batch file(s)
-    FILE *batch = fopen(BATCH_FILE, "r");
+    FILE *batch = fopen(BATCH_FILE_0, "r");
     assert(batch != NULL);
     // name is BATCH_FILE
-    strcpy(batchinfo[0].name, BATCH_FILE);
+    strcpy(batchinfo[0].name, BATCH_FILE_0);
     // phyaddr is the current position of STREAM *img
     batchinfo[0].phyaddr = ftell(img);
     // write batch file into img
@@ -171,11 +172,21 @@ static void create_image(int nfiles, char *files[]) {
     batchinfo[0].size = ftell(batch);
     // close
     fclose(batch);
-    // autorun on load
+    // execute on load
     batchinfo[0].execute_on_load = 1;
 
+    // the same as above, but disable execute on load
+    batch = fopen(BATCH_FILE_1, "r");
+    assert(batch != NULL);
+    strcpy(batchinfo[1].name, BATCH_FILE_1);
+    batchinfo[1].phyaddr = ftell(img);
+    write_batch_file(img, batch);
+    batchinfo[1].size = ftell(batch);
+    fclose(batch);
+    batchinfo[1].execute_on_load = 0;
+
     // write batch info
-    write_batch_info(batchinfo, 1, img);
+    write_batch_info(batchinfo, 2, img);
     // TEST: write batch file(s) end
 
     fclose(img);
@@ -262,7 +273,7 @@ static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
     fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
 
     // write task num
-    printf("Task num: 0x%d\n", tasknum);
+    printf("Task num: %d\n", tasknum);
     fseek(img, TASK_NUM_LOC, SEEK_SET);
     fwrite(&tasknum, sizeof(short), 1, img);
 
@@ -288,7 +299,7 @@ static void write_batch_info(batch_info_t *batchinfo, short batchnum, FILE *img)
     fwrite(batchinfo, sizeof(batch_info_t), batchnum, img);
 
     // write batch num
-    printf("Batch num: 0x%d\n", batchnum);
+    printf("Batch num: %d\n", batchnum);
     fseek(img, BATCH_NUM_LOC, SEEK_SET);
     fwrite(&batchnum, sizeof(short), 1, img);
 
