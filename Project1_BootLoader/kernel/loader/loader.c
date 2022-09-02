@@ -16,7 +16,7 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, unsigned int size, int cop
      * (size+offset) / SECTOR_SIZE are sectors which only contain the task and the head sector
      * if the remaining != 0 -> there's a tail sector
      */
-    int num_of_blocks = ((size + offset) / SECTOR_SIZE)
+    unsigned int num_of_blocks = ((size + offset) / SECTOR_SIZE)
                       + ((size + offset) % SECTOR_SIZE ? 1 : 0);
 
     // load
@@ -26,15 +26,12 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, unsigned int size, int cop
 
     if (copy) {
         // copy data from (mem_addr + offset) to (mem_addr)
-        // copy 8 bytes at once
-        uint64_t *src = (uint64_t *) (memaddr + offset);
-        uint64_t *dst = (uint64_t *) memaddr;
-        int rounds = size / sizeof(uint64_t) + 1;
-        for (int i = 0; i < rounds; i++) {
-            *dst++ = *src++;
-        }
+        uint8_t *src = (uint8_t *) (memaddr + offset);
+        uint8_t *dst = (uint8_t *) memaddr;
+        memcpy(dst, src, size);
         return memaddr;
     } else {
+        // doesn't copy, return the actual memaddr
         return memaddr + offset;
     }
 
