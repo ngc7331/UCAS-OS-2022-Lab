@@ -14,6 +14,7 @@
 #define BOOT_LOADER_SIG_OFFSET 0x1fe
 #define OS_SIZE_LOC (BOOT_LOADER_SIG_OFFSET - 2)
 #define TASK_NUM_LOC (OS_SIZE_LOC - 2)
+#define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
 #define BOOT_LOADER_SIG_1 0x55
 #define BOOT_LOADER_SIG_2 0xaa
 
@@ -212,18 +213,9 @@ static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
     // write image info to some certain places
     // os size, information about app-info sector(s) ...
 
-    /* FIXME: this mechanism may should be changed
-     * now img file is like : | bootblock taskinfos tasknum ossize | kernel | apps |
-     * it may should be like: | bootblock     taskinfo_addr ossize | kernel | apps | tasknum taskinfos |
-     * for short: taskinfos should be write to the end of img, taskinfo_addr points to it
-     * kernel should find them by taskinfo_addr, and load them by bios_sdread()
-     */
-
+    long taskinfos_phyaddr = ftell(img);
     // write taskinfos to the end of img
-    // unsigned int taskinfos_phyaddr = ftell(img);
-    // the first 2 bytes are tasknum
-    // fputc(tasknum, img);
-    // fputc(tasknum >> 8, img);
+    fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
 
     // write os size
     int nsecs_kern = NBYTES2SEC(nbytes_kern);
@@ -231,18 +223,15 @@ static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
     fseek(img, OS_SIZE_LOC, SEEK_SET);
     fwrite(&nsecs_kern, sizeof(int), 1, img);
 
-    // write task infos phyaddr
-    // printf("Task infos phyaddr: 0x%lx\n", taskinfos_phyaddr);
-    // fseek(img, TASK_INFO_P_LOC, SEEK_SET);
-    // fwrite(&taskinfos_phyaddr, sizeof(long), 1, img);
-
-    // FIXME: write tasknum
-    printf("Tasknum: %d\n", tasknum);
+    // write task num
+    printf("Task num: 0x%d\n", tasknum);
     fseek(img, TASK_NUM_LOC, SEEK_SET);
     fwrite(&tasknum, sizeof(short), 1, img);
-    // FIXME: write task infos before tasknum
-    fseek(img, TASK_NUM_LOC - sizeof(task_info_t) * tasknum, SEEK_SET);
-    fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
+
+    // write task infos phyaddr
+    printf("Task infos phyaddr: 0x%lx\n", taskinfos_phyaddr);
+    fseek(img, TASK_INFO_P_LOC, SEEK_SET);
+    fwrite(&taskinfos_phyaddr, sizeof(long), 1, img);
 }
 
 /* print an error message and exit */

@@ -10,6 +10,7 @@
 
 #define BUFSIZE 64
 #define TASK_NUM_LOC 0x502001fa
+#define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
 
 int version = 2; // version must between 0 and 9
 char buf[BUFSIZE];
@@ -36,21 +37,23 @@ static void init_bios(void) {
     jmptab[SD_READ]         = (long (*)())sd_read;
 }
 
+static void init_task_info(void) {
+    // Init 'tasks' array via reading app-info sector
+    // load pointer from TASK_INFO_P_LOC
+    long taskinfos_phyaddr = *((long *) TASK_INFO_P_LOC);
+    tasknum = *((short *) TASK_NUM_LOC);
+    // read img to some random memory
+    task_info_t *task = (task_info_t *) load_img(TASK_MEM_BASE, taskinfos_phyaddr,
+                                                 sizeof(task_info_t) * tasknum, FALSE);
+    for (short i=0; i<tasknum; i++, task++)
+        tasks[i] = *task;
+}
+
 static void print_help(void) {
     bios_putstr("[kernel] App list:\n\r");
     for (int i=0; i<tasknum; i++) {
         console_print("\t________________________________\n\r", tasks[i].name);
     }
-}
-
-static void init_task_info(void) {
-    // Init 'tasks' array via reading app-info sector
-    // FIXME: See tools/createimage.c L#225
-    // NOTE: You need to get some related arguments from bootblock first
-    tasknum = *((int *) TASK_NUM_LOC);
-    task_info_t *task = (task_info_t *) (TASK_NUM_LOC - sizeof(task_info_t) * tasknum);
-    for (short i=0; i<tasknum; i++, task++)
-        tasks[i] = *task;
 }
 
 int main(void) {
