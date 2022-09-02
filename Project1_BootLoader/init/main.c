@@ -1,5 +1,6 @@
 #include <asm.h>
 #include <common.h>
+#include <os/batch.h>
 #include <os/bios.h>
 #include <os/console.h>
 #include <os/loader.h>
@@ -11,13 +12,19 @@
 #define BUFSIZE 64
 #define TASK_NUM_LOC 0x502001fa
 #define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
+#define BATCH_NUM_LOC (TASK_INFO_P_LOC - 2)
+#define BATCH_INFO_P_LOC (BATCH_NUM_LOC - 8)
 
 int version = 2; // version must between 0 and 9
 char buf[BUFSIZE];
 
-short tasknum;
-// Task info array
+// tasks
 task_info_t tasks[TASK_MAXNUM];
+short tasknum;
+
+// batchs
+batch_info_t batchs[BATCH_MAXNUM];
+short batchnum;
 
 static int bss_check(void) {
     for (int i = 0; i < BUFSIZE; ++i) {
@@ -40,13 +47,22 @@ static void init_bios(void) {
 static void init_task_info(void) {
     // Init 'tasks' array via reading app-info sector
     // load pointer from TASK_INFO_P_LOC
-    long taskinfos_phyaddr = *((long *) TASK_INFO_P_LOC);
+    long phyaddr = *((long *) TASK_INFO_P_LOC);
     tasknum = *((short *) TASK_NUM_LOC);
     // read img to some random memory
-    task_info_t *task = (task_info_t *) load_img(TASK_MEM_BASE, taskinfos_phyaddr,
+    task_info_t *task = (task_info_t *) load_img(TASK_MEM_BASE, phyaddr,
                                                  sizeof(task_info_t) * tasknum, FALSE);
-    for (short i=0; i<tasknum; i++, task++)
-        tasks[i] = *task;
+    for (int i=0; i<tasknum; i++)
+        tasks[i] = *task++;
+}
+
+static void init_batch_info(void) {
+    long phyaddr = *((long *) BATCH_INFO_P_LOC);
+    batchnum = *((short *) BATCH_NUM_LOC);
+    batch_info_t *batch = (batch_info_t *) load_img(BATCH_MEM_BASE, phyaddr,
+                                                    sizeof(batch_info_t) * batchnum, FALSE);
+    for (int i=0; i<batchnum; i++)
+        batchs[i] = *batch++;
 }
 
 static void print_help(void) {
@@ -66,6 +82,9 @@ int main(void) {
     // Init task information (〃'▽'〃)
     init_task_info();
 
+    // Init batch file information orz
+    init_batch_info();
+
     // Output 'Hello OS!', bss check result and OS version
     bios_putstr("[kernel] Hello OS!\n\r");
 
@@ -76,6 +95,19 @@ int main(void) {
 
     itoa(tasknum, 10, buf, BUFSIZE, 0);
     console_print("[kernel] D: tasknum=__\n\r", buf);
+
+    // execute batch(s)
+    for (int i=0; i<batchnum; i++) {
+        if(batchs[i].execute_on_load) {
+            console_print("[kernel] I: ===== executing batch: "
+                          "________________________________"
+                          " =====\n\r", batchs[i].name);
+            batch_execute(i);
+            console_print("[kernel] I: ===== completed batch: "
+                          "________________________________"
+                          " =====\n\r", batchs[i].name);
+        }
+    }
 
     // Load tasks by task name and then execute them.
     while (1) {

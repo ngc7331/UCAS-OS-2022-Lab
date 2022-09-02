@@ -8,6 +8,7 @@
 #include <elf.h>
 
 #define IMAGE_FILE "./image"
+#define BATCH_FILE "test.bat"
 #define ARGS "[--extended] [--vm] <bootblock> <executable-file> ..."
 
 #define SECTOR_SIZE 512
@@ -15,6 +16,8 @@
 #define OS_SIZE_LOC (BOOT_LOADER_SIG_OFFSET - 2)
 #define TASK_NUM_LOC (OS_SIZE_LOC - 2)
 #define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
+#define BATCH_NUM_LOC (TASK_INFO_P_LOC - 2)
+#define BATCH_INFO_P_LOC (BATCH_NUM_LOC - 8)
 #define BOOT_LOADER_SIG_1 0x55
 #define BOOT_LOADER_SIG_2 0xaa
 
@@ -28,8 +31,18 @@ typedef struct {
     int phyaddr;
 } task_info_t;
 
+typedef struct {
+    char name[32];
+    int size;
+    int phyaddr;
+    int execute_on_load;
+} batch_info_t;
+
 #define TASK_MAXNUM 16
 static task_info_t taskinfo[TASK_MAXNUM];
+
+#define BATCH_MAXNUM 16
+static batch_info_t batchinfo[BATCH_MAXNUM];
 
 /* structure to store command line options */
 static struct {
@@ -47,6 +60,8 @@ static uint32_t get_filesz(Elf64_Phdr phdr);
 static uint32_t get_memsz(Elf64_Phdr phdr);
 static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr);
 static void write_padding(FILE *img, int *phyaddr, int new_phyaddr);
+static void write_batch_file(FILE *img, FILE *batch);
+static void write_batch_info(batch_info_t *batchinfo, short batchnum, FILE *img);
 static void write_img_info(int nbytes_kernel, task_info_t *taskinfo,
                            short tasknum, FILE *img);
 
@@ -89,7 +104,7 @@ static void create_image(int nfiles, char *files[]) {
     Elf64_Ehdr ehdr;
     Elf64_Phdr phdr;
 
-    /* open the image file */
+    // open the image file
     img = fopen(IMAGE_FILE, "w");
     assert(img != NULL);
 
@@ -139,7 +154,29 @@ static void create_image(int nfiles, char *files[]) {
         fclose(fp);
         files++;
     }
+
+    // write img info (os size / tasks / tasknum)
     write_img_info(nbytes_kernel, taskinfo, tasknum, img);
+
+    // TEST: write batch file(s)
+    FILE *batch = fopen(BATCH_FILE, "r");
+    assert(batch != NULL);
+    // name is BATCH_FILE
+    strcpy(batchinfo[0].name, BATCH_FILE);
+    // phyaddr is the current position of STREAM *img
+    batchinfo[0].phyaddr = ftell(img);
+    // write batch file into img
+    write_batch_file(img, batch);
+    // size is the current position of STREAM *batch
+    batchinfo[0].size = ftell(batch);
+    // close
+    fclose(batch);
+    // autorun on load
+    batchinfo[0].execute_on_load = 1;
+
+    // write batch info
+    write_batch_info(batchinfo, 1, img);
+    // TEST: write batch file(s) end
 
     fclose(img);
 }
@@ -213,15 +250,16 @@ static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
     // write image info to some certain places
     // os size, information about app-info sector(s) ...
 
-    long taskinfos_phyaddr = ftell(img);
-    // write taskinfos to the end of img
-    fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
-
     // write os size
     int nsecs_kern = NBYTES2SEC(nbytes_kern);
     printf("OS sectors: %d\n", nsecs_kern);
     fseek(img, OS_SIZE_LOC, SEEK_SET);
     fwrite(&nsecs_kern, sizeof(int), 1, img);
+
+    // write taskinfos to the end of img
+    fseek(img, 0, SEEK_END);
+    long taskinfos_phyaddr = ftell(img);
+    fwrite(taskinfo, sizeof(task_info_t), tasknum, img);
 
     // write task num
     printf("Task num: 0x%d\n", tasknum);
@@ -232,6 +270,32 @@ static void write_img_info(int nbytes_kern, task_info_t *taskinfo,
     printf("Task infos phyaddr: 0x%lx\n", taskinfos_phyaddr);
     fseek(img, TASK_INFO_P_LOC, SEEK_SET);
     fwrite(&taskinfos_phyaddr, sizeof(long), 1, img);
+
+    fseek(img, 0, SEEK_END);
+}
+
+static void write_batch_file(FILE *img, FILE *batch) {
+    int buf;
+    while ((buf=fgetc(batch)) != EOF)
+        fputc(buf, img);
+    fputc(0, img);
+}
+
+static void write_batch_info(batch_info_t *batchinfo, short batchnum, FILE *img) {
+    // write batchinfos to the end of img
+    fseek(img, 0, SEEK_END);
+    long batchinfos_phyaddr = ftell(img);
+    fwrite(batchinfo, sizeof(batch_info_t), batchnum, img);
+
+    // write batch num
+    printf("Batch num: 0x%d\n", batchnum);
+    fseek(img, BATCH_NUM_LOC, SEEK_SET);
+    fwrite(&batchnum, sizeof(short), 1, img);
+
+    // write batch infos phyaddr
+    printf("Batch infos phyaddr: 0x%lx\n", batchinfos_phyaddr);
+    fseek(img, BATCH_INFO_P_LOC, SEEK_SET);
+    fwrite(&batchinfos_phyaddr, sizeof(long), 1, img);
 }
 
 /* print an error message and exit */
