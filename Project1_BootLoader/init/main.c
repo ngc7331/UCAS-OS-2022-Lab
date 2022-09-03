@@ -110,7 +110,7 @@ int main(void) {
 
     // Load tasks by task name and then execute them.
     while (1) {
-        bios_putstr("> ");
+        bios_putstr("\n\r> ");
 
         console_getline(buf, BUFSIZE);
         if (strcmp(buf, "help") == 0) {
