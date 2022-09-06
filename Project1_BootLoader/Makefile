@@ -162,6 +162,11 @@ $(ELF_CREATEIMAGE): $(SRC_CREATEIMAGE)
 	$(HOST_CC) $(SRC_CREATEIMAGE) -o $@ -ggdb -Wall
 
 image: $(ELF_CREATEIMAGE) $(ELF_BOOT) $(ELF_MAIN) $(ELF_USER)
-	cp *.bat $(DIR_BUILD) && cd $(DIR_BUILD) && ./$(<F) --extended $(filter-out $(<F), $(^F)) --batch *.bat
+	if [ -n "`find $(DIR_BUILD) -name '*.bat'`" ]; then rm $(DIR_BUILD)/*.bat; fi
+	if [ -n "`find . -name '*.bat'`" ]; then \
+		cp *.bat $(DIR_BUILD) && cd $(DIR_BUILD) && ./$(<F) --extended $(filter-out $(<F), $(^F)) --batch *.bat; \
+	else \
+		cd $(DIR_BUILD) && ./$(<F) --extended $(filter-out $(<F), $(^F)); \
+	fi
 
 .PHONY: image

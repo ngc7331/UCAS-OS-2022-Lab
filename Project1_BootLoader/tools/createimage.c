@@ -8,9 +8,7 @@
 #include <elf.h>
 
 #define IMAGE_FILE "./image"
-#define BATCH_FILE_0 "autorun.bat"
-#define BATCH_FILE_1 "manual.bat"
-#define ARGS "[--extended] [--vm] <bootblock> <executable-file> ..."
+#define ARGS "[--extended] [--vm] <bootblock> <executable-file> ... [--batch <batchfile> ...]"
 
 #define SECTOR_SIZE 512
 #define BOOT_LOADER_SIG_OFFSET 0x1fe
@@ -112,6 +110,12 @@ static void create_image(int nfiles, char *files[]) {
     // for each input file
     for (int fidx = 0; fidx < nfiles; ++fidx) {
 
+        if (strcmp(*files, "--batch") == 0) {
+            nfiles --;  // - --batch
+            files ++;
+            break;
+        }
+
         int taskidx = fidx - 2;
 
         // open input file
@@ -157,17 +161,14 @@ static void create_image(int nfiles, char *files[]) {
         fclose(fp);
         files++;
 
-        if (strcmp(*files, "--batch") == 0) {
-            nfiles -= fidx + 2;  // (fidx+1) are apps, another 1 is "--batch"
-            files++;
-            break;
-        }
     }
 
     // write img info (os size / tasks / tasknum)
     write_img_info(nbytes_kernel, taskinfo, tasknum, img);
 
-    // TEST: write batch file(s)
+    nfiles -= tasknum + 2;  // - bootblock main <tasks>
+
+    // write batch file(s)
     for (int fidx = 0; fidx < nfiles; ++fidx) {
         FILE *batch = fopen(*files, "r");
         assert(batch != NULL);
@@ -193,8 +194,6 @@ static void create_image(int nfiles, char *files[]) {
 
     // write batch info
     write_batch_info(batchinfo, nfiles, img);
-
-    // TEST: write batch file(s) end
 
     fclose(img);
 }
