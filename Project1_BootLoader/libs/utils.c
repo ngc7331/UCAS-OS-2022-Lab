@@ -88,7 +88,7 @@ int lstrip(char *s) {
 // remove spaces from right end
 int rstrip(char *s) {
     char *tmp = s;
-    int len = 0;
+    int len = -1;
     for (int i=0; *s; i++, s++)
         len = is_space(*s) ? len : i;
     tmp[len+1] = '\0';
