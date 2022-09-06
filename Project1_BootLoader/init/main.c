@@ -106,7 +106,7 @@ int main(void) {
     // execute batch(s)
     for (int i=0; i<batchnum; i++)
         if(batchs[i].execute_on_load)
-            batch_execute(i);
+            run_batch(i);
 
     // Load tasks by task name and then execute them.
     while (1) {
@@ -122,7 +122,7 @@ int main(void) {
             if (batchid < 0)
                 console_print("[kernel] E: no such batch: ________________________________\n\r", buf+6);
             else
-                batch_execute(batchid);
+                run_batch(batchid);
             continue;
         }
 
