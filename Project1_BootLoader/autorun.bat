@@ -1,3 +1,4 @@
+1
 auipc
 bss
 data

@@ -6,6 +6,7 @@
 #include <os/console.h>
 #include <os/loader.h>
 #include <os/task.h>
+#include <os/utils.h>
 
 #define BATCH_MEM_BASE    0x53000000
 #define BATCH_MAXNUM      16

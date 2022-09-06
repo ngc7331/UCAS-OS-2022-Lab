@@ -17,8 +17,9 @@ int run_batch(int batchid) {
             buf[i++] = *file++;
         file += *file == '\n';
 
-        if (i == 0) continue;
         buf[i] = '\0';
+        i = strip(buf);
+        if (i == 0) continue;
 
         console_print(" -> executing ________________________________\n\r", buf);
         int taskid = get_taskid_by_name(buf);

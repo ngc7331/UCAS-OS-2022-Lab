@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
 }
 
 static void create_image(int nfiles, char *files[]) {
-    int tasknum = nfiles - 2;
+    int tasknum = 0;
     int nbytes_kernel = 0;
     int phyaddr = 0;
     FILE *fp = NULL, *img = NULL;
@@ -149,44 +149,51 @@ static void create_image(int nfiles, char *files[]) {
         }
 
         task.size = phyaddr - task.phyaddr;
-        if (taskidx >= 0)  // skip bootblock & main
+        if (taskidx >= 0) { // skip bootblock & main
             taskinfo[taskidx] = task;
+            tasknum = taskidx + 1;
+        }
 
         fclose(fp);
         files++;
+
+        if (strcmp(*files, "--batch") == 0) {
+            nfiles -= fidx + 2;  // (fidx+1) are apps, another 1 is "--batch"
+            files++;
+            break;
+        }
     }
 
     // write img info (os size / tasks / tasknum)
     write_img_info(nbytes_kernel, taskinfo, tasknum, img);
 
     // TEST: write batch file(s)
-    FILE *batch = fopen(BATCH_FILE_0, "r");
-    assert(batch != NULL);
-    // name is BATCH_FILE
-    strcpy(batchinfo[0].name, BATCH_FILE_0);
-    // phyaddr is the current position of STREAM *img
-    batchinfo[0].phyaddr = ftell(img);
-    // write batch file into img
-    write_batch_file(img, batch);
-    // size is the current position of STREAM *batch
-    batchinfo[0].size = ftell(batch);
-    // close
-    fclose(batch);
-    // execute on load
-    batchinfo[0].execute_on_load = 1;
+    for (int fidx = 0; fidx < nfiles; ++fidx) {
+        FILE *batch = fopen(*files, "r");
+        assert(batch != NULL);
 
-    // the same as above, but disable execute on load
-    batch = fopen(BATCH_FILE_1, "r");
-    assert(batch != NULL);
-    strcpy(batchinfo[1].name, BATCH_FILE_1);
-    batchinfo[1].phyaddr = ftell(img);
-    write_batch_file(img, batch);
-    batchinfo[1].size = ftell(batch);
-    fclose(batch);
-    batchinfo[1].execute_on_load = 0;
+        // name is *files
+        strcpy(batchinfo[fidx].name, *files);
+        // phyaddr is the current position of STREAM *img
+        batchinfo[fidx].phyaddr = ftell(img);
+
+        // the first two bytes of batch file is "execute_on_load" and '\n'
+        batchinfo[fidx].execute_on_load = fgetc(batch) - '0';
+        fgetc(batch);  // '\n'
+
+        // write batch file into img
+        write_batch_file(img, batch);
+        // size is the (current position of STREAM *batch) - 2
+        batchinfo[fidx].size = ftell(batch) - 2;
+
+        // close
+        fclose(batch);
+        files ++;
+    }
 
     // write batch info
-    write_batch_info(batchinfo, 2, img);
+    write_batch_info(batchinfo, nfiles, img);
+
     // TEST: write batch file(s) end
 
     fclose(img);
