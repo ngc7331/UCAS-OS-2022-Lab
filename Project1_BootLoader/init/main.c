@@ -113,6 +113,8 @@ int main(void) {
         bios_putstr("\n\r> ");
 
         console_getline(buf, BUFSIZE);
+        strip(buf);
+
         if (strcmp(buf, "help") == 0) {
             print_help();
             continue;

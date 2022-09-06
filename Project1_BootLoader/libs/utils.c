@@ -73,3 +73,30 @@ void itoa(int i, int radix, char *a, int len, int zero_pad) {
 
     *a = '\0';
 }
+
+// remove spaces from left end
+int lstrip(char *s) {
+    char *tmp = s;
+    int len = 0;
+    while (is_space(*s)) s++;
+    for (; *s; len++, s++)
+        tmp[len] = *s;
+    tmp[len] = '\0';
+    return len;
+}
+
+// remove spaces from right end
+int rstrip(char *s) {
+    char *tmp = s;
+    int len = 0;
+    for (int i=0; *s; i++, s++)
+        len = is_space(*s) ? len : i;
+    tmp[len+1] = '\0';
+    return len+1;
+}
+
+// remove spaces from both end
+int strip(char *s) {
+    lstrip(s);
+    return rstrip(s);
+}
