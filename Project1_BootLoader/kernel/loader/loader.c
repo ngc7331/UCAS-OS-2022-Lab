@@ -1,7 +1,6 @@
-#include <os/task.h>
-#include <os/string.h>
 #include <os/bios.h>
-#include <type.h>
+#include <os/loader.h>
+#include <os/string.h>
 
 #define SECTOR_SIZE 512
 
@@ -37,9 +36,10 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, unsigned int size, int cop
 
 }
 
-uint64_t load_task_img(int taskid) {
+uint64_t load_task_img(int taskid, task_type_t type) {
     // load task via taskid, which is converted by kernel
-    task_info_t task = tasks[taskid];
+    task_info_t task = type == APP ? apps[taskid] : batchs[taskid];
+    uint64_t memaddr = type == APP ? task.entrypoint : BATCH_MEM_BASE;
 
-    return load_img(task.entrypoint, task.phyaddr, task.size, TRUE);
+    return load_img(memaddr, task.phyaddr, task.size, type==APP);
 }
