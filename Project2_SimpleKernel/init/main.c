@@ -25,11 +25,11 @@ extern void ret_from_exception();
 
 // required tasks
 // p2-task1
-#define NEEDED_TASKS {"print1", "print2", "fly"}
-#define NEEDED_TASK_NUM 3
+// #define NEEDED_TASKS {"print1", "print2", "fly"}
+// #define NEEDED_TASK_NUM 3
 // p2-task2
-// #define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
-// #define NEEDED_TASK_NUM 5
+#define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
+#define NEEDED_TASK_NUM 5
 
 // last allocated pid
 int pid_n = 0;
@@ -135,6 +135,7 @@ static void init_pcb(void)
         pcb[i].kernel_sp = allocKernelPage(1);
         pcb[i].user_sp = allocUserPage(1);
         pcb[i].pid = ++pid_n;
+        strcpy(pcb[i].name, apps[id].name);
         pcb[i].status = TASK_READY;
         init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[id].entrypoint, &pcb[i]);
         pcb_enqueue(&ready_queue, &pcb[i]);

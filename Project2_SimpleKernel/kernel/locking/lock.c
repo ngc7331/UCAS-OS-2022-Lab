@@ -7,42 +7,74 @@ mutex_lock_t mlocks[LOCK_NUM];
 
 void init_locks(void)
 {
-    /* TODO: [p2-task2] initialize mlocks */
+    // initialize mlocks
+    for (int i=0; i<LOCK_NUM; i++) {
+        spin_lock_init(&mlocks[i].lock);
+        list_init(&mlocks[i].block_queue);
+        mlocks[i].allocated = 0;
+    }
 }
 
 void spin_lock_init(spin_lock_t *lock)
 {
-    /* TODO: [p2-task2] initialize spin lock */
+    // initialize spin lock
+    lock->status = UNLOCKED;
 }
 
 int spin_lock_try_acquire(spin_lock_t *lock)
 {
-    /* TODO: [p2-task2] try to acquire spin lock */
-    return 0;
+    // try to acquire spin lock
+    int status = atomic_swap_d(LOCKED, lock->status);
+    return status;
 }
 
 void spin_lock_acquire(spin_lock_t *lock)
 {
-    /* TODO: [p2-task2] acquire spin lock */
+    // acquire spin lock
+    while (spin_lock_try_acquire(lock) == LOCKED) ;
 }
 
 void spin_lock_release(spin_lock_t *lock)
 {
-    /* TODO: [p2-task2] release spin lock */
+    // release spin lock
+    lock->status = UNLOCKED;
 }
 
 int do_mutex_lock_init(int key)
 {
-    /* TODO: [p2-task2] initialize mutex lock */
-    return 0;
+    // initialize mutex lock
+    int i;
+    for (i=0; i<LOCK_NUM; i++)
+        if (mlocks[i].allocated == 0 || mlocks[i].key == key)
+            break;
+    mlocks[i].allocated = 1;
+    mlocks[i].key = key;
+    printl("[mlock] lock#%d inited, key=%d\n", i, key);
+    return i;
 }
 
 void do_mutex_lock_acquire(int mlock_idx)
 {
-    /* TODO: [p2-task2] acquire mutex lock */
+    // acquire mutex lock
+    printl("[mlock] acquire lock#%d... ", mlock_idx);
+    if (mlocks[mlock_idx].lock.status == LOCKED) {
+        printl("locked, block\n");
+        do_block(current_running, &mlocks[mlock_idx].block_queue);
+    } else {
+        printl("done\n");
+        mlocks[mlock_idx].lock.status = LOCKED;
+    }
 }
 
 void do_mutex_lock_release(int mlock_idx)
 {
-    /* TODO: [p2-task2] release mutex lock */
+    // release mutex lock
+    printl("[mlock] release lock#%d... ", mlock_idx);
+    if (list_is_empty(&mlocks[mlock_idx].block_queue)) {
+        printl("done, block_queue empty\n");
+        mlocks[mlock_idx].lock.status = UNLOCKED;
+    } else {
+        printl("done, unblock\n");
+        do_unblock(&mlocks[mlock_idx].block_queue);
+    }
 }

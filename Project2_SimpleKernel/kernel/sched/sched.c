@@ -12,7 +12,8 @@ const ptr_t pid0_stack = INIT_KERNEL_STACK + PAGE_SIZE;
 pcb_t pid0_pcb = {
     .pid = 0,
     .kernel_sp = (ptr_t)pid0_stack,
-    .user_sp = (ptr_t)pid0_stack
+    .user_sp = (ptr_t)pid0_stack,
+    .name = "init"
 };
 
 LIST_HEAD(ready_queue);
@@ -37,6 +38,8 @@ void do_scheduler(void)
     pcb_t *next = pcb_dequeue(&ready_queue);
     pcb_t *prev = current_running;
 
+    printl("[scheduler] %d.%s -> %d.%s\n", prev->pid, prev->name, next->pid, next->name);
+
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;
         pcb_enqueue(&ready_queue, prev);
@@ -60,12 +63,20 @@ void do_sleep(uint32_t sleep_time)
     // 3. reschedule because the current_running is blocked.
 }
 
-void do_block(list_node_t *pcb_node, list_head *queue)
+void do_block(pcb_t *pcb, list_head *queue)
 {
-    // TODO: [p2-task2] block the pcb task into the block queue
+    // block the pcb task into the block queue
+    printl("[scheduler] block %d.%s\n", pcb->pid, pcb->name);
+    pcb_enqueue(queue, pcb);
+    pcb->status = TASK_BLOCKED;
+    do_scheduler();
 }
 
-void do_unblock(list_node_t *pcb_node)
+void do_unblock(list_head *queue)
 {
-    // TODO: [p2-task2] unblock the `pcb` from the block queue
+    // unblock the `pcb` from the block queue
+    pcb_t *pcb = pcb_dequeue(queue);
+    printl("[scheduler] unblock %d.%s\n", pcb->pid, pcb->name);
+    pcb->status = TASK_READY;
+    pcb_enqueue(&ready_queue, pcb);
 }

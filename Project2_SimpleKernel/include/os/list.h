@@ -55,6 +55,7 @@ typedef list_node_t list_head;
 
 // implement your own list API
 // NOTE: l shouldn't be NULL
+list_node_t *list_init(list_node_t *l);
 list_node_t *list_insert(list_node_t *l, list_node_t *n);
 list_node_t *list_delete(list_node_t *l);
 int list_is_empty(list_node_t *l);
