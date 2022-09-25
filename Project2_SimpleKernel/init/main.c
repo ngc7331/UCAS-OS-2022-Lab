@@ -1,21 +1,27 @@
 #include <asm.h>
+#include <assert.h>
+#include <asm/unistd.h>
 #include <common.h>
-#include <os/bios.h>
-#include <os/console.h>
+#include <csr.h>
+#include <os/irq.h>
+#include <os/kernel.h>
 #include <os/loader.h>
+#include <os/lock.h>
+#include <os/mm.h>
+#include <os/sched.h>
 #include <os/string.h>
 #include <os/task.h>
+#include <os/time.h>
 #include <os/utils.h>
+#include <printk.h>
+#include <screen.h>
+#include <sys/syscall.h>
 #include <type.h>
 
-#define BUFSIZE 64
 #define TASK_NUM_LOC 0x502001fa
 #define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
-#define BATCH_NUM_LOC (TASK_INFO_P_LOC - 2)
-#define BATCH_INFO_P_LOC (BATCH_NUM_LOC - 8)
 
-int version = 2; // version must between 0 and 9
-char buf[BUFSIZE];
+extern void ret_from_exception();
 
 // tasks
 task_info_t apps[APP_MAXNUM];
@@ -23,22 +29,23 @@ short appnum;
 task_info_t batchs[BATCH_MAXNUM];
 short batchnum;
 
-static int bss_check(void) {
-    for (int i = 0; i < BUFSIZE; ++i) {
-        if (buf[i] != 0) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-static void init_bios(void) {
-    volatile long (*(*jmptab))() = (volatile long (*(*))())BIOS_JMPTAB_BASE;
+static void init_jmptab(void) {
+    volatile long (*(*jmptab))() = (volatile long (*(*))())KERNEL_JMPTAB_BASE;
 
     jmptab[CONSOLE_PUTSTR]  = (long (*)())port_write;
     jmptab[CONSOLE_PUTCHAR] = (long (*)())port_write_ch;
     jmptab[CONSOLE_GETCHAR] = (long (*)())port_read_ch;
     jmptab[SD_READ]         = (long (*)())sd_read;
+    jmptab[QEMU_LOGGING]    = (long (*)())qemu_logging;
+    jmptab[SET_TIMER]       = (long (*)())set_timer;
+    jmptab[READ_FDT]        = (long (*)())read_fdt;
+    jmptab[MOVE_CURSOR]     = (long (*)())screen_move_cursor;
+    jmptab[PRINT]           = (long (*)())printk;
+    jmptab[YIELD]           = (long (*)())do_scheduler;
+    jmptab[MUTEX_INIT]      = (long (*)())do_mutex_lock_init;
+    jmptab[MUTEX_ACQ]       = (long (*)())do_mutex_lock_acquire;
+    jmptab[MUTEX_RELEASE]   = (long (*)())do_mutex_lock_release;
+
 }
 
 static void init_task_info(void) {
@@ -58,100 +65,81 @@ static void init_task_info(void) {
     }
 }
 
-static void print_help(void) {
-    bios_putstr("[kernel] I: === HELP START ===\n\r");
+static void init_pcb_stack(
+    ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
+    pcb_t *pcb) {
+     /* TODO: [p2-task3] initialization of registers on kernel stack
+      * HINT: sp, ra, sepc, sstatus
+      * NOTE: To run the task in user mode, you should set corresponding bits
+      *     of sstatus(SPP, SPIE, etc.).
+      */
+    regs_context_t *pt_regs =
+        (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
 
-    bios_putstr("  App list: (use \"<name>\" to execute)\n\r");
-    for (int i=0; i<appnum; i++)
-        console_print("    - ________________________________\n\r", apps[i].name);
+    /* TODO: [p2-task1] set sp to simulate just returning from switch_to
+     * NOTE: you should prepare a stack, and push some values to
+     * simulate a callee-saved context.
+     */
+    switchto_context_t *pt_switchto =
+        (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
-    bios_putstr("  Batch list: (use \"batch <name>\" to execute)\n\r");
-    for (int i=0; i<batchnum; i++)
-        console_print("    - ________________________________\n\r", batchs[i].name);
+}
 
-    bios_putstr("[kernel] I: ==== HELP END ====\n\r");
+static void init_pcb(void)
+{
+    /* TODO: [p2-task1] load needed tasks and init their corresponding PCB */
+
+
+    /* TODO: [p2-task1] remember to initialize 'current_running' */
+
+}
+
+static void init_syscall(void)
+{
+    // TODO: [p2-task3] initialize system call table.
 }
 
 int main(void) {
-    // Check whether .bss section is set to zero
-    int check = bss_check();
-
     // Init jump table provided by BIOS (ΦωΦ)
-    init_bios();
+    init_jmptab();
 
     // Init task information (〃'▽'〃)
     init_task_info();
 
-    // Output 'Hello OS!', bss check result and OS version
-    bios_putstr("[kernel] Hello OS!\n\r");
+    // Init Process Control Blocks |•'-'•) ✧
+    init_pcb();
+    printk("> [INIT] PCB initialization succeeded.\n");
 
-    buf[0] = check ? 't' : 'f';
-    buf[1] = version + '0';
-    buf[2] = '\0';
-    console_print("[kernel] I: bss check=_, version=_\n\r", buf);
+    // Read CPU frequency (｡•ᴗ-)_
+    time_base = bios_read_fdt(TIMEBASE);
 
-    itoa(appnum, 10, buf, BUFSIZE, 0);
-    console_print("[kernel] D: tasknum=__, ", buf);
-    itoa(batchnum, 10, buf, BUFSIZE, 0);
-    console_print("batchnum=__\n\r", buf);
+    // Init lock mechanism o(´^｀)o
+    init_locks();
+    printk("> [INIT] Lock mechanism initialization succeeded.\n");
 
-    // execute batch(s)
-    for (int i=0; i<batchnum; i++)
-        if(batchs[i].execute_on_load)
-            run_batch(i);
+     // Init interrupt (^_^)
+    init_exception();
+    printk("> [INIT] Interrupt processing initialization succeeded.\n");
 
-    // Load tasks by task name and then execute them.
-    while (1) {
-        bios_putstr("\n\r> ");
+    // Init system call table (0_0)
+    init_syscall();
+    printk("> [INIT] System call initialized successfully.\n");
 
-        console_getline(buf, BUFSIZE);
-        strip(buf);
+    // Init screen (QAQ)
+    init_screen();
+    printk("> [INIT] SCREEN initialization succeeded.\n");
 
-        if (strcmp(buf, "help") == 0) {
-            print_help();
-            continue;
-        }
-        if (strncmp(buf, "batch ", 5) == 0) {
-            lstrip(buf+6);
-            int batchid = get_taskid_by_name(buf+6, BATCH);
-            if (batchid < 0)
-                console_print("[kernel] E: no such batch: ________________________________\n\r", buf+6);
-            else
-                run_batch(batchid);
-            continue;
-        }
-
-        int appid = get_taskid_by_name(buf, APP);
-        if (appid < 0) {
-            console_print("[kernel] E: no such app: ________________________________\n\r", buf);
-            continue;
-        }
-
-        // TEST
-        itoa(appid, 10, buf, BUFSIZE, 0);
-        console_print("[kernel] D: appid=__,", buf);
-        itoa(apps[appid].entrypoint, 16, buf, BUFSIZE, 8);
-        console_print(" entrypoint=__________,", buf);
-        itoa(apps[appid].phyaddr, 16, buf, BUFSIZE, 8);
-        console_print(" phyaddr=__________,", buf);
-        itoa(apps[appid].size, 16, buf, BUFSIZE, 8);
-        console_print(" size=__________\n\r", buf);
-
-        console_print("[kernel] I: Loading user app: ________________________________...", apps[appid].name);
-
-        int (*app)() = (int (*)()) load_task_img(appid, APP);
-        if (app == 0)
-            bios_putstr(" error, abort\n\r");
-        else {
-            bios_putstr(" loaded, running\n\r");
-            app();
-            bios_putstr("[kernel] I: Finished\n\r");
-        }
-    }
+    // TODO: [p2-task4] Setup timer interrupt and enable all interrupt globally
+    // NOTE: The function of sstatus.sie is different from sie's
 
     // Infinite while loop, where CPU stays in a low-power state (QAQQQQQQQQQQQ)
     while (1) {
-        asm volatile("wfi");
+        // If you do non-preemptive scheduling, it's used to surrender control
+        do_scheduler();
+
+        // If you do preemptive scheduling, they're used to enable CSR_SIE and wfi
+        // enable_preempt();
+        // asm volatile("wfi");
     }
 
     return 0;

@@ -1,7 +1,7 @@
 #ifndef __INCLUDE_UTILS_H__
 #define __INCLUDE_UTILS_H__
 
-#include <os/bios.h>
+#include <os/kernel.h>
 #include <type.h>
 
 int is_space(char c);

@@ -1,7 +1,7 @@
 #ifndef __INCLUDE_CONSOLE_H__
 #define __INCLUDE_CONSOLE_H__
 
-#include <os/bios.h>
+#include <os/kernel.h>
 #include <os/string.h>
 #include <type.h>
 

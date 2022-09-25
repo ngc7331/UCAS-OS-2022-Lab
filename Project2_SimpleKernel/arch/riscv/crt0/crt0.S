@@ -1,5 +1,6 @@
 #include <asm.h>
 
+.section ".entry_function","ax"
 ENTRY(_start)
     // setup C runtime environment for the user program
     // push return address

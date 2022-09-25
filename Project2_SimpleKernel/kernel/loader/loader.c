@@ -1,4 +1,4 @@
-#include <os/bios.h>
+#include <os/kernel.h>
 #include <os/loader.h>
 #include <os/string.h>
 
