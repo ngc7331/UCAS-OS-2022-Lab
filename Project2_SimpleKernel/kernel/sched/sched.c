@@ -17,6 +17,8 @@ pcb_t pid0_pcb = {
 
 LIST_HEAD(ready_queue);
 LIST_HEAD(sleep_queue);
+void pcb_enqueue(list_node_t *queue, pcb_t *pcb);
+pcb_t *pcb_dequeue(list_node_t *queue);
 
 /* current running task PCB */
 pcb_t * volatile current_running;
@@ -28,12 +30,25 @@ void do_scheduler(void)
 {
     // TODO: [p2-task3] Check sleep queue to wake up PCBs
 
+    // no more tasks
+    if (list_is_empty(&ready_queue))
+        return ;
 
-    // TODO: [p2-task1] Modify the current_running pointer.
+    pcb_t *next = pcb_dequeue(&ready_queue);
+    pcb_t *prev = current_running;
 
+    if (prev->status == TASK_RUNNING) {
+        prev->status = TASK_READY;
+        pcb_enqueue(&ready_queue, prev);
+    }
+    next->status = TASK_RUNNING;
 
-    // TODO: [p2-task1] switch_to current_running
+    // Modify the current_running pointer.
+    process_id = prev->pid;
+    current_running = next;
 
+    // switch_to current_running
+    switch_to(prev, current_running);
 }
 
 void do_sleep(uint32_t sleep_time)

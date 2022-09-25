@@ -50,6 +50,13 @@ typedef list_node_t list_head;
 // LIST_HEAD is used to define the head of a list.
 #define LIST_HEAD(name) struct list_node name = {&(name), &(name)}
 
-/* TODO: [p2-task1] implement your own list API */
+#define offset_of(tp, mem) ((size_t) (&((tp *) 0)->mem))
+#define list_entry(ptr, tp, mem) ((tp *)((char *) (ptr) - offset_of(tp, mem)))
+
+// implement your own list API
+// NOTE: l shouldn't be NULL
+list_node_t *list_insert(list_node_t *l, list_node_t *n);
+list_node_t *list_delete(list_node_t *l);
+int list_is_empty(list_node_t *l);
 
 #endif

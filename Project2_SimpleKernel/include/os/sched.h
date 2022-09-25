@@ -50,7 +50,10 @@ typedef struct regs_context
 /* used to save register infomation in switch_to */
 typedef struct switchto_context
 {
-    /* Callee saved registers.*/
+    /* Callee saved registers.
+     * ra, sp, s0 ~ s11
+     * see arch/riscv/include/asm/regs.h
+    */
     reg_t regs[14];
 } switchto_context_t;
 

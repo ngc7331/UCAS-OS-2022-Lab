@@ -23,6 +23,17 @@
 
 extern void ret_from_exception();
 
+// required tasks
+// p2-task1
+#define NEEDED_TASKS {"print1", "print2", "fly"}
+#define NEEDED_TASK_NUM 3
+// p2-task2
+// #define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
+// #define NEEDED_TASK_NUM 5
+
+// last allocated pid
+int pid_n = 0;
+
 // tasks
 task_info_t apps[APP_MAXNUM];
 short appnum;
@@ -76,26 +87,64 @@ static void init_pcb_stack(
     regs_context_t *pt_regs =
         (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
 
-    /* TODO: [p2-task1] set sp to simulate just returning from switch_to
-     * NOTE: you should prepare a stack, and push some values to
+    // set sp to simulate just returning from switch_to
+    /* NOTE: you should prepare a stack, and push some values to
      * simulate a callee-saved context.
      */
     switchto_context_t *pt_switchto =
         (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
+    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t);
+    pcb->user_sp = user_stack;
+
+    // save regs to kernel_stack
+    pt_switchto->regs[0] = entry_point;
+    pt_switchto->regs[1] = kernel_stack;
+    for (int i=2; i<14; i++)
+        pt_switchto->regs[i] = 0;
+
+}
+
+void pcb_enqueue(list_node_t *queue, pcb_t *pcb) {
+    list_insert(queue->prev, &pcb->list);
+}
+
+pcb_t *pcb_dequeue(list_node_t *queue) {
+    pcb_t *pcb = list_entry(queue->next, pcb_t, list);
+    list_delete(queue->next);
+    return pcb;
 }
 
 static void init_pcb(void)
 {
-    /* TODO: [p2-task1] load needed tasks and init their corresponding PCB */
+    // load needed tasks and init their corresponding PCB
+    char *needed_tasks[] = NEEDED_TASKS;
+    for (int i=0; i<NEEDED_TASK_NUM; i++) {
+        int id = -1;
+        for (int j=0; j<appnum; j++) {
+            if (strcmp(needed_tasks[i], apps[j].name) == 0) {
+                id = j;
+                break;
+            }
+        }
+        if (id == -1) {
+            printk("> [INIT] Failed to init task: %s", needed_tasks[i]);
+            continue;
+        }
+        load_task_img(id, APP);
+        pcb[i].kernel_sp = allocKernelPage(1);
+        pcb[i].user_sp = allocUserPage(1);
+        pcb[i].pid = ++pid_n;
+        pcb[i].status = TASK_READY;
+        init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[id].entrypoint, &pcb[i]);
+        pcb_enqueue(&ready_queue, &pcb[i]);
+    }
 
-
-    /* TODO: [p2-task1] remember to initialize 'current_running' */
-
+    // remember to initialize 'current_running'
+    current_running = &pid0_pcb;
 }
 
-static void init_syscall(void)
-{
+static void init_syscall(void) {
     // TODO: [p2-task3] initialize system call table.
 }
 
