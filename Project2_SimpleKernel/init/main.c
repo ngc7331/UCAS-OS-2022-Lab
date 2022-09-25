@@ -30,6 +30,7 @@ extern void ret_from_exception();
 // p2-task2
 #define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
 #define NEEDED_TASK_NUM 5
+// for p2-task3~5, run all tasks
 
 // last allocated pid
 int pid_n = 0;
@@ -115,8 +116,7 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
     return pcb;
 }
 
-static void init_pcb(void)
-{
+static void init_pcb(void) {
     // load needed tasks and init their corresponding PCB
     char *needed_tasks[] = NEEDED_TASKS;
     for (int i=0; i<NEEDED_TASK_NUM; i++) {
@@ -137,7 +137,12 @@ static void init_pcb(void)
         pcb[i].pid = ++pid_n;
         strcpy(pcb[i].name, apps[id].name);
         pcb[i].status = TASK_READY;
+
+        printl("[init] load %s as pid=%d\n", pcb[i].name, pcb[i].pid);
+        printl("[init]\t entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
+
         init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[id].entrypoint, &pcb[i]);
+
         pcb_enqueue(&ready_queue, &pcb[i]);
     }
 
@@ -158,26 +163,26 @@ int main(void) {
 
     // Init Process Control Blocks |•'-'•) ✧
     init_pcb();
-    printk("> [INIT] PCB initialization succeeded.\n");
+    printl("> [INIT] PCB initialization succeeded.\n");
 
     // Read CPU frequency (｡•ᴗ-)_
     time_base = bios_read_fdt(TIMEBASE);
 
     // Init lock mechanism o(´^｀)o
     init_locks();
-    printk("> [INIT] Lock mechanism initialization succeeded.\n");
+    printl("> [INIT] Lock mechanism initialization succeeded.\n");
 
      // Init interrupt (^_^)
     init_exception();
-    printk("> [INIT] Interrupt processing initialization succeeded.\n");
+    printl("> [INIT] Interrupt processing initialization succeeded.\n");
 
     // Init system call table (0_0)
     init_syscall();
-    printk("> [INIT] System call initialized successfully.\n");
+    printl("> [INIT] System call initialized successfully.\n");
 
     // Init screen (QAQ)
     init_screen();
-    printk("> [INIT] SCREEN initialization succeeded.\n");
+    printl("> [INIT] SCREEN initialization succeeded.\n");
 
     // TODO: [p2-task4] Setup timer interrupt and enable all interrupt globally
     // NOTE: The function of sstatus.sie is different from sie's

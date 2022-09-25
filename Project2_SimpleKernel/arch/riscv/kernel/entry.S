@@ -92,6 +92,8 @@ ENTRY(switch_to)
   ld   s11, SWITCH_TO_S11(sp)
   ld   sp,  SWITCH_TO_SP(sp)
 
+  add  tp, a1, zero
+
   addi sp, sp, SWITCH_TO_SIZE
   jr ra
 ENDPROC(switch_to)
