@@ -95,12 +95,12 @@ static void init_pcb_stack(
     switchto_context_t *pt_switchto =
         (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
-    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t);
+    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t);
     pcb->user_sp = user_stack;
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = entry_point;
-    pt_switchto->regs[1] = kernel_stack;
+    pt_switchto->regs[1] = user_stack;
     for (int i=2; i<14; i++)
         pt_switchto->regs[i] = 0;
 
@@ -120,20 +120,14 @@ static void init_pcb(void) {
     // load needed tasks and init their corresponding PCB
     char *needed_tasks[] = NEEDED_TASKS;
     for (int i=0; i<NEEDED_TASK_NUM; i++) {
-        int id = -1;
-        for (int j=0; j<appnum; j++) {
-            if (strcmp(needed_tasks[i], apps[j].name) == 0) {
-                id = j;
-                break;
-            }
-        }
+        int id = get_taskid_by_name(needed_tasks[i], APP);
         if (id == -1) {
             printk("> [INIT] Failed to init task: %s", needed_tasks[i]);
             continue;
         }
         load_task_img(id, APP);
-        pcb[i].kernel_sp = allocKernelPage(1);
-        pcb[i].user_sp = allocUserPage(1);
+        pcb[i].kernel_sp = allocKernelPage(1) + PAGE_SIZE;
+        pcb[i].user_sp = allocUserPage(1) + PAGE_SIZE;
         pcb[i].pid = ++pid_n;
         strcpy(pcb[i].name, apps[id].name);
         pcb[i].status = TASK_READY;

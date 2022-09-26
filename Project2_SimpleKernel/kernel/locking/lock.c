@@ -24,7 +24,7 @@ void spin_lock_init(spin_lock_t *lock)
 int spin_lock_try_acquire(spin_lock_t *lock)
 {
     // try to acquire spin lock
-    int status = atomic_swap_d(LOCKED, lock->status);
+    int status = atomic_swap_d(LOCKED, &lock->status);
     return status;
 }
 
@@ -43,26 +43,36 @@ void spin_lock_release(spin_lock_t *lock)
 int do_mutex_lock_init(int key)
 {
     // initialize mutex lock
-    int i;
-    for (i=0; i<LOCK_NUM; i++)
-        if (mlocks[i].allocated == 0 || mlocks[i].key == key)
-            break;
-    mlocks[i].allocated = 1;
-    mlocks[i].key = key;
-    printl("[mlock] lock#%d inited, key=%d\n", i, key);
-    return i;
+    // key has been allocated with a lock
+    for (int i=0; i<LOCK_NUM; i++) {
+        if (mlocks[i].key == key) {
+            mlocks[i].allocated ++;
+            printl("[mlock] lock#%d found, key=%d\n", i, key);
+            return i;
+        }
+    }
+    // allocate a new lock
+    for (int i=0; i<LOCK_NUM; i++) {
+        if (mlocks[i].allocated == 0) {
+            mlocks[i].allocated = 1;
+            mlocks[i].key = key;
+            printl("[mlock] lock#%d inited, key=%d\n", i, key);
+            return i;
+        }
+    }
+    // allocate failed
+    return -1;
 }
 
 void do_mutex_lock_acquire(int mlock_idx)
 {
     // acquire mutex lock
     printl("[mlock] acquire lock#%d... ", mlock_idx);
-    if (mlocks[mlock_idx].lock.status == LOCKED) {
+    if (atomic_swap_d(LOCKED, &mlocks[mlock_idx].lock.status) == UNLOCKED) {
+        printl("done\n");
+    } else {
         printl("locked, block\n");
         do_block(current_running, &mlocks[mlock_idx].block_queue);
-    } else {
-        printl("done\n");
-        mlocks[mlock_idx].lock.status = LOCKED;
     }
 }
 

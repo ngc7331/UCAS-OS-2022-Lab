@@ -50,15 +50,18 @@ ENDPROC(disable_interrupt)
 // NOTE: the address of previous pcb in a0
 // NOTE: the address of next pcb in a1
 ENTRY(switch_to)
+  // save previous user_stack
+  add  t0, sp, zero
+  // switch to previous kernel_stack
+  ld   sp, PCB_KERNEL_SP(a0)
   addi sp, sp, -(SWITCH_TO_SIZE)
-  ld   t0, PCB_KERNEL_SP(a0)
-  sd   sp, SWITCH_TO_SP(t0)
   /* save all callee save registers on kernel stack,
    * see the definition of `struct switchto_context` in sched.h
    * see arch/riscv/include/asm/regs.h
    */
-  add  sp, t0, zero
+
   sd   ra,  SWITCH_TO_RA(sp)
+  sd   t0,  SWITCH_TO_SP(sp)
   sd   s0,  SWITCH_TO_S0(sp)
   sd   s1,  SWITCH_TO_S1(sp)
   sd   s2,  SWITCH_TO_S2(sp)
@@ -72,12 +75,15 @@ ENTRY(switch_to)
   sd   s10, SWITCH_TO_S10(sp)
   sd   s11, SWITCH_TO_S11(sp)
 
+  // switch to next kernel_stack
+  ld   sp, PCB_KERNEL_SP(a1)
+  addi sp, sp, -(SWITCH_TO_SIZE)
   /* restore all callee save registers from kernel stack,
    * see the definition of `struct switchto_context` in sched.h
    * see arch/riscv/include/asm/regs.h
    */
-  ld   sp, PCB_KERNEL_SP(a1)
   ld   ra,  SWITCH_TO_RA(sp)
+  ld   t0,  SWITCH_TO_SP(sp)
   ld   s0,  SWITCH_TO_S0(sp)
   ld   s1,  SWITCH_TO_S1(sp)
   ld   s2,  SWITCH_TO_S2(sp)
@@ -90,11 +96,13 @@ ENTRY(switch_to)
   ld   s9,  SWITCH_TO_S9(sp)
   ld   s10, SWITCH_TO_S10(sp)
   ld   s11, SWITCH_TO_S11(sp)
-  ld   sp,  SWITCH_TO_SP(sp)
+  // switch to next user_stack
+;   addi sp, sp, (SWITCH_TO_SIZE)
+  add  sp, t0, zero
 
+  // set tp = current_running
   add  tp, a1, zero
 
-  addi sp, sp, SWITCH_TO_SIZE
   jr ra
 ENDPROC(switch_to)
 
