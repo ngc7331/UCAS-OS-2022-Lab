@@ -23,15 +23,6 @@
 
 extern void ret_from_exception();
 
-// required tasks
-// p2-task1
-// #define NEEDED_TASKS {"print1", "print2"}
-// #define NEEDED_TASK_NUM 2
-// p2-task2
-#define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
-#define NEEDED_TASK_NUM 5
-// for p2-task3~5, run all tasks
-
 // last allocated pid
 int pid_n = 0;
 
@@ -129,24 +120,18 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
 
 static void init_pcb(void) {
     // load needed tasks and init their corresponding PCB
-    char *needed_tasks[] = NEEDED_TASKS;
-    for (int i=0; i<NEEDED_TASK_NUM; i++) {
-        int id = get_taskid_by_name(needed_tasks[i], APP);
-        if (id == -1) {
-            printk("> [INIT] Failed to init task: %s", needed_tasks[i]);
-            continue;
-        }
-        load_task_img(id, APP);
+    for (int i=0; i<appnum; i++) {
+        load_task_img(i, APP);
         pcb[i].kernel_sp = allocKernelPage(1) + PAGE_SIZE;
         pcb[i].user_sp = allocUserPage(1) + PAGE_SIZE;
         pcb[i].pid = ++pid_n;
-        strcpy(pcb[i].name, apps[id].name);
+        strcpy(pcb[i].name, apps[i].name);
         pcb[i].status = TASK_READY;
 
         printl("[init] load %s as pid=%d\n", pcb[i].name, pcb[i].pid);
-        printl("[init]\t entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
+        printl("[init]\t entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
 
-        init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[id].entrypoint, &pcb[i]);
+        init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[i].entrypoint, &pcb[i]);
 
         pcb_enqueue(&ready_queue, &pcb[i]);
     }

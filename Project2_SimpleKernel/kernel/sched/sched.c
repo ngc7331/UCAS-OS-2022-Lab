@@ -57,11 +57,17 @@ void do_scheduler(void)
 
 void do_sleep(uint32_t sleep_time)
 {
-    // TODO: [p2-task3] sleep(seconds)
+    // sleep(seconds)
     // NOTE: you can assume: 1 second = 1 `timebase` ticks
     // 1. block the current_running
+    current_running->status = TASK_BLOCKED;
     // 2. set the wake up time for the blocked task
+    uint64_t cur_time = get_ticks();
+    current_running->wakeup_time = cur_time + sleep_time * time_base;
     // 3. reschedule because the current_running is blocked.
+    printl("[timer] block %d.%s at %d, wakeup at %d\n", current_running->pid, current_running->name, cur_time, current_running->wakeup_time);
+    pcb_enqueue(&sleep_queue, current_running);
+    do_scheduler();
 }
 
 void do_block(pcb_t *pcb, list_head *queue)

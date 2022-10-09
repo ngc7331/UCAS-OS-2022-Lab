@@ -1,9 +1,12 @@
 #include <os/list.h>
 #include <os/sched.h>
 #include <type.h>
+#include <printk.h>
 
 uint64_t time_elapsed = 0;
 uint64_t time_base = 0;
+
+void pcb_enqueue(list_node_t *queue, pcb_t *pcb);
 
 uint64_t get_ticks()
 {
@@ -33,5 +36,17 @@ void latency(uint64_t time)
 
 void check_sleeping(void)
 {
-    // TODO: [p2-task3] Pick out tasks that should wake up from the sleep queue
+    // Pick out tasks that should wake up from the sleep queue
+    uint64_t cur_time = get_ticks();
+    for (list_node_t *p=sleep_queue.next; p!=&sleep_queue; ) {
+        pcb_t *pcb = list_entry(p, pcb_t, list);
+        if (pcb->wakeup_time <= cur_time) {
+            printl("[timer] unblock %d.%s at %d, expected at %d\n", pcb->pid, pcb->name, cur_time, pcb->wakeup_time);
+            p = list_delete(p);
+            pcb->status = TASK_READY;
+            pcb_enqueue(&ready_queue, pcb);
+        } else {
+            p = p->next;
+        }
+    }
 }
