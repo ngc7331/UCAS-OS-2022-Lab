@@ -41,7 +41,7 @@
   sd   s9, OFFSET_REG_S9(sp)
   sd   s10, OFFSET_REG_S10(sp)
   sd   s11, OFFSET_REG_S11(sp)
-  // user stack pointer to kernel stack
+  // save user stack pointer to kernel stack
   ld   t0, PCB_USER_SP(tp)
   sd   t0, OFFSET_REG_SP(sp)
 
@@ -107,8 +107,7 @@
   ld   t0, OFFSET_REG_SSTATUS(sp)
   csrw CSR_SSTATUS, t0
 
-  // load tp & sp from kernel stack
-;   ld   tp, OFFSET_REG_TP(sp)
+  // load user stack pointer from kernel stack
   ld   sp, PCB_USER_SP(tp)
 .endm
 
@@ -140,13 +139,13 @@ ENDPROC(disable_interrupt)
 ENTRY(switch_to)
   // save previous user_stack
   add  t0, sp, zero
-  // switch to previous kernel_stack
+  // prepare stack space for switch_to
   addi sp, sp, -(SWITCH_TO_SIZE)
+
   /* save all callee save registers on kernel stack,
    * see the definition of `struct switchto_context` in sched.h
    * see arch/riscv/include/asm/regs.h
    */
-
   sd   ra,  SWITCH_TO_RA(sp)
   sd   t0,  SWITCH_TO_SP(sp)
   sd   s0,  SWITCH_TO_S0(sp)
@@ -182,7 +181,8 @@ ENTRY(switch_to)
   ld   s9,  SWITCH_TO_S9(sp)
   ld   s10, SWITCH_TO_S10(sp)
   ld   s11, SWITCH_TO_S11(sp)
-  // switch to next user_stack
+
+  // recover stack space
   addi sp, sp, (SWITCH_TO_SIZE)
 
   // set tp = current_running

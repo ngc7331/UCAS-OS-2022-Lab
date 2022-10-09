@@ -110,7 +110,7 @@ static void init_pcb_stack(
     pcb->user_sp = user_stack;
 
     // save regs to kernel_stack
-    pt_switchto->regs[0] = ret_from_exception;
+    pt_switchto->regs[0] = (reg_t) ret_from_exception;
     pt_switchto->regs[1] = user_stack;
     for (int i=2; i<14; i++)
         pt_switchto->regs[i] = 0;

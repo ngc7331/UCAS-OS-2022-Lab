@@ -52,7 +52,7 @@ void sys_move_cursor(int x, int y)
 void sys_write(char *buff)
 {
     /* call invoke_syscall to implement sys_write */
-    invoke_syscall(SYSCALL_WRITE, buff, IGNORE, IGNORE, IGNORE, IGNORE);
+    invoke_syscall(SYSCALL_WRITE, (long) buff, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
 void sys_reflush(void)
