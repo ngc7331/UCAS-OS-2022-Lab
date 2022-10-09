@@ -25,8 +25,8 @@ extern void ret_from_exception();
 
 // required tasks
 // p2-task1
-// #define NEEDED_TASKS {"print1", "print2", "fly"}
-// #define NEEDED_TASK_NUM 3
+// #define NEEDED_TASKS {"print1", "print2"}
+// #define NEEDED_TASK_NUM 2
 // p2-task2
 #define NEEDED_TASKS {"print1", "print2", "fly", "lock1", "lock2"}
 #define NEEDED_TASK_NUM 5
@@ -80,13 +80,24 @@ static void init_task_info(void) {
 static void init_pcb_stack(
     ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
     pcb_t *pcb) {
-     /* TODO: [p2-task3] initialization of registers on kernel stack
+     /* initialization of registers on kernel stack
       * HINT: sp, ra, sepc, sstatus
       * NOTE: To run the task in user mode, you should set corresponding bits
       *     of sstatus(SPP, SPIE, etc.).
       */
     regs_context_t *pt_regs =
         (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
+
+    for (int i=0; i<32; i++)
+        pt_regs->regs[i] = 0;
+    pt_regs->sbadaddr = 0;
+    pt_regs->scause = 0;
+    pt_regs->sstatus = SR_SIE;
+
+    pt_regs->sepc = entry_point;
+    pt_regs->regs[1] = entry_point;
+    pt_regs->regs[2] = user_stack;
+    pt_regs->regs[4] = (reg_t) pcb;
 
     // set sp to simulate just returning from switch_to
     /* NOTE: you should prepare a stack, and push some values to
@@ -95,11 +106,11 @@ static void init_pcb_stack(
     switchto_context_t *pt_switchto =
         (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
-    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t);
+    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t);
     pcb->user_sp = user_stack;
 
     // save regs to kernel_stack
-    pt_switchto->regs[0] = entry_point;
+    pt_switchto->regs[0] = ret_from_exception;
     pt_switchto->regs[1] = user_stack;
     for (int i=2; i<14; i++)
         pt_switchto->regs[i] = 0;
@@ -145,7 +156,18 @@ static void init_pcb(void) {
 }
 
 static void init_syscall(void) {
-    // TODO: [p2-task3] initialize system call table.
+    // initialize system call table.
+    // see arch/riscv/include/asm/unistd.h
+    syscall[SYSCALL_SLEEP]        = (long (*)())&do_sleep;
+    syscall[SYSCALL_YIELD]        = (long (*)())&do_scheduler;
+    syscall[SYSCALL_WRITE]        = (long (*)())&screen_write;
+    syscall[SYSCALL_CURSOR]       = (long (*)())&screen_move_cursor;
+    syscall[SYSCALL_REFLUSH]      = (long (*)())&screen_reflush;
+    syscall[SYSCALL_GET_TIMEBASE] = (long (*)())&get_time_base;
+    syscall[SYSCALL_GET_TICK]     = (long (*)())&get_ticks;
+    syscall[SYSCALL_LOCK_INIT]    = (long (*)())&do_mutex_lock_init;
+    syscall[SYSCALL_LOCK_ACQ]     = (long (*)())&do_mutex_lock_acquire;
+    syscall[SYSCALL_LOCK_RELEASE] = (long (*)())&do_mutex_lock_release;
 }
 
 int main(void) {
@@ -180,6 +202,7 @@ int main(void) {
 
     // TODO: [p2-task4] Setup timer interrupt and enable all interrupt globally
     // NOTE: The function of sstatus.sie is different from sie's
+    enable_interrupt();
 
     // Infinite while loop, where CPU stays in a low-power state (QAQQQQQQQQQQQ)
     while (1) {

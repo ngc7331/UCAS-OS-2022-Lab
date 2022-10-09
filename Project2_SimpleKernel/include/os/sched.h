@@ -37,7 +37,16 @@
 /* used to save register infomation */
 typedef struct regs_context
 {
-    /* Saved main processor registers.*/
+    /* Saved main processor registers.
+       0    : zero
+       1    : ra
+       2~4  : sp, gp, tp
+       6~7  : t0~t2
+       8~9  : s0~s1
+       10~17: a0~a7
+       18~27: s2~s11
+       28~31: t3~t6
+    */
     reg_t regs[32];
 
     /* Saved special registers. */

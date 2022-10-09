@@ -5,6 +5,7 @@
 #include <os/kernel.h>
 #include <printk.h>
 #include <assert.h>
+#include <csr.h>
 #include <screen.h>
 
 handler_t irq_table[IRQC_COUNT];
@@ -12,8 +13,17 @@ handler_t exc_table[EXCC_COUNT];
 
 void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t scause)
 {
-    // TODO: [p2-task3] & [p2-task4] interrupt handler.
+    // interrupt handler.
     // call corresponding handler by the value of `scause`
+    handler_t handler;
+    long is_irq = scause & SCAUSE_IRQ_FLAG;
+    long code = scause & ~SCAUSE_IRQ_FLAG;
+    if (is_irq) {
+        handler = irq_table[code];
+    } else {
+        handler = exc_table[code];
+    }
+    handler(regs, stval, scause);
 }
 
 void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
@@ -24,13 +34,17 @@ void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
 
 void init_exception()
 {
-    /* TODO: [p2-task3] initialize exc_table */
-    /* NOTE: handle_syscall, handle_other, etc.*/
+    /* initialize exc_table
+     * handle_syscall, handle_other, etc.*/
+    for (int i=0; i<EXCC_COUNT; i++)
+        exc_table[i] = handle_other;
+    exc_table[EXCC_SYSCALL] = handle_syscall;
 
     /* TODO: [p2-task4] initialize irq_table */
     /* NOTE: handle_int, handle_other, etc.*/
 
-    /* TODO: [p2-task3] set up the entrypoint of exceptions */
+    /* set up the entrypoint of exceptions */
+    setup_exception();
 }
 
 void handle_other(regs_context_t *regs, uint64_t stval, uint64_t scause)

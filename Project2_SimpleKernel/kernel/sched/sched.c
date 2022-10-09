@@ -29,7 +29,8 @@ pid_t process_id = 1;
 
 void do_scheduler(void)
 {
-    // TODO: [p2-task3] Check sleep queue to wake up PCBs
+    // Check sleep queue to wake up PCBs
+    check_sleeping();
 
     // no more tasks
     if (list_is_empty(&ready_queue))

@@ -2,6 +2,7 @@
 #include <os/sched.h>
 #include <os/list.h>
 #include <atomic.h>
+#include <printk.h>
 
 mutex_lock_t mlocks[LOCK_NUM];
 
@@ -24,7 +25,7 @@ void spin_lock_init(spin_lock_t *lock)
 int spin_lock_try_acquire(spin_lock_t *lock)
 {
     // try to acquire spin lock
-    int status = atomic_swap_d(LOCKED, &lock->status);
+    int status = atomic_swap_d(LOCKED, (ptr_t)&lock->status);
     return status;
 }
 
@@ -68,7 +69,7 @@ void do_mutex_lock_acquire(int mlock_idx)
 {
     // acquire mutex lock
     printl("[mlock] acquire lock#%d... ", mlock_idx);
-    if (atomic_swap_d(LOCKED, &mlocks[mlock_idx].lock.status) == UNLOCKED) {
+    if (atomic_swap_d(LOCKED, (ptr_t)&mlocks[mlock_idx].lock.status) == UNLOCKED) {
         printl("done\n");
     } else {
         printl("locked, block\n");

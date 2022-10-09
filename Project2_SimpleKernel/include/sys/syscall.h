@@ -28,6 +28,7 @@
 #ifndef INCLUDE_SYSCALL_H_
 #define INCLUDE_SYSCALL_H_
 
+#include <asm/unistd.h>
 #include <os/sched.h>
 #include <type.h>
 
