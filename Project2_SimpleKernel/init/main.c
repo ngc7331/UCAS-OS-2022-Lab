@@ -12,7 +12,6 @@
 #include <os/string.h>
 #include <os/task.h>
 #include <os/time.h>
-#include <os/utils.h>
 #include <printk.h>
 #include <screen.h>
 #include <sys/syscall.h>
@@ -83,7 +82,7 @@ static void init_pcb_stack(
         pt_regs->regs[i] = 0;
     pt_regs->sbadaddr = 0;
     pt_regs->scause = 0;
-    pt_regs->sstatus = SR_SIE;
+    pt_regs->sstatus = SR_SPIE;
 
     pt_regs->sepc = entry_point;
     pt_regs->regs[1] = entry_point;
@@ -97,7 +96,7 @@ static void init_pcb_stack(
     switchto_context_t *pt_switchto =
         (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
-    pcb->kernel_sp = kernel_stack - sizeof(regs_context_t) - sizeof(switchto_context_t);
+    pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = user_stack;
 
     // save regs to kernel_stack
@@ -126,10 +125,11 @@ static void init_pcb(void) {
         pcb[i].user_sp = allocUserPage(1) + PAGE_SIZE;
         pcb[i].pid = ++pid_n;
         strcpy(pcb[i].name, apps[i].name);
+        pcb[i].cursor_x = pcb[i].cursor_y = 0;
         pcb[i].status = TASK_READY;
 
-        printl("[init] load %s as pid=%d\n", pcb[i].name, pcb[i].pid);
-        printl("[init]\t entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
+        logging(LOG_DEBUG, "init", "load %s as pid=%d\n", pcb[i].name, pcb[i].pid);
+        logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
 
         init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[i].entrypoint, &pcb[i]);
 
@@ -162,28 +162,31 @@ int main(void) {
     // Init task information (〃'▽'〃)
     init_task_info();
 
+    // set log level
+    set_loglevel(LOG_DEBUG);
+
     // Init Process Control Blocks |•'-'•) ✧
     init_pcb();
-    printl("> [INIT] PCB initialization succeeded.\n");
+    logging(LOG_INFO, "init", "PCB initialization succeeded.\n");
 
     // Read CPU frequency (｡•ᴗ-)_
     time_base = bios_read_fdt(TIMEBASE);
 
     // Init lock mechanism o(´^｀)o
     init_locks();
-    printl("> [INIT] Lock mechanism initialization succeeded.\n");
+    logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
 
      // Init interrupt (^_^)
     init_exception();
-    printl("> [INIT] Interrupt processing initialization succeeded.\n");
+    logging(LOG_INFO, "init", "Interrupt processing initialization succeeded.\n");
 
     // Init system call table (0_0)
     init_syscall();
-    printl("> [INIT] System call initialized successfully.\n");
+    logging(LOG_INFO, "init", "System call initialized successfully.\n");
 
     // Init screen (QAQ)
     init_screen();
-    printl("> [INIT] SCREEN initialization succeeded.\n");
+    logging(LOG_INFO, "init", "SCREEN initialization succeeded.\n");
 
     // TODO: [p2-task4] Setup timer interrupt and enable all interrupt globally
     // NOTE: The function of sstatus.sie is different from sie's

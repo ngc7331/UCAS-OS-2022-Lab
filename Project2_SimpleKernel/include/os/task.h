@@ -32,6 +32,5 @@ extern task_info_t batchs[BATCH_MAXNUM];
 extern short batchnum;
 
 int get_taskid_by_name(char *name, task_type_t type);
-int run_batch(int batchid);
 
 #endif

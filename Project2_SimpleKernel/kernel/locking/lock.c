@@ -48,7 +48,7 @@ int do_mutex_lock_init(int key)
     for (int i=0; i<LOCK_NUM; i++) {
         if (mlocks[i].key == key) {
             mlocks[i].allocated ++;
-            printl("[mlock] lock#%d found, key=%d\n", i, key);
+            logging(LOG_INFO, "mlock", "lock#%d found, key=%d\n", i, key);
             return i;
         }
     }
@@ -57,7 +57,7 @@ int do_mutex_lock_init(int key)
         if (mlocks[i].allocated == 0) {
             mlocks[i].allocated = 1;
             mlocks[i].key = key;
-            printl("[mlock] lock#%d inited, key=%d\n", i, key);
+            logging(LOG_INFO, "mlock", "lock#%d inited, key=%d\n", i, key);
             return i;
         }
     }
@@ -68,11 +68,11 @@ int do_mutex_lock_init(int key)
 void do_mutex_lock_acquire(int mlock_idx)
 {
     // acquire mutex lock
-    printl("[mlock] acquire lock#%d... ", mlock_idx);
+    logging(LOG_INFO, "mlock", "acquire lock#%d...\n", mlock_idx);
     if (atomic_swap_d(LOCKED, (ptr_t)&mlocks[mlock_idx].lock.status) == UNLOCKED) {
-        printl("done\n");
+        logging(LOG_INFO, "mlock", "...success\n");
     } else {
-        printl("locked, block\n");
+        logging(LOG_INFO, "mlock", "...failed, block\n");
         do_block(current_running, &mlocks[mlock_idx].block_queue);
     }
 }
@@ -80,12 +80,12 @@ void do_mutex_lock_acquire(int mlock_idx)
 void do_mutex_lock_release(int mlock_idx)
 {
     // release mutex lock
-    printl("[mlock] release lock#%d... ", mlock_idx);
+    logging(LOG_INFO, "mlock", "release lock#%d...\n", mlock_idx);
     if (list_is_empty(&mlocks[mlock_idx].block_queue)) {
-        printl("done, block_queue empty\n");
+        logging(LOG_INFO, "mlock", "success\n");
         mlocks[mlock_idx].lock.status = UNLOCKED;
     } else {
-        printl("done, unblock\n");
+        logging(LOG_INFO, "mlock", "success, unblock a process from queue\n");
         do_unblock(&mlocks[mlock_idx].block_queue);
     }
 }

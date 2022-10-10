@@ -37,11 +37,10 @@ void latency(uint64_t time)
 void check_sleeping(void)
 {
     // Pick out tasks that should wake up from the sleep queue
-    uint64_t cur_time = get_ticks();
     for (list_node_t *p=sleep_queue.next; p!=&sleep_queue; ) {
         pcb_t *pcb = list_entry(p, pcb_t, list);
-        if (pcb->wakeup_time <= cur_time) {
-            printl("[timer] unblock %d.%s at %d, expected at %d\n", pcb->pid, pcb->name, cur_time, pcb->wakeup_time);
+        if (pcb->wakeup_time <= get_ticks()) {
+            logging(LOG_INFO, "timer", "unblock %d.%s, expected at %d\n", pcb->pid, pcb->name, pcb->wakeup_time);
             p = list_delete(p);
             pcb->status = TASK_READY;
             pcb_enqueue(&ready_queue, pcb);

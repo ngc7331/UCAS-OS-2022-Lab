@@ -43,8 +43,10 @@
 #include <screen.h>
 #include <stdarg.h>
 #include <os/sched.h>
+#include <os/time.h>
 #include <os/irq.h>
 #include <os/kernel.h>
+#include <printk.h>
 
 static unsigned int mini_strlen(const char *s)
 {
@@ -290,4 +292,48 @@ int printl(const char *fmt, ...)
     va_end(va);
 
     return ret;
+}
+
+#define ENABLE_LOGGING
+
+static loglevel_t __level = LOG_VERBOSE;
+
+int logging(loglevel_t level, const char* name, const char *fmt, ...)
+{
+#ifndef ENABLE_LOGGING
+    return -1;
+#else
+    if (level < __level) return -1;
+    char buf[37];
+    char __dict[7] = "VDIWEC";
+    int ret = 23;
+    va_list va;
+
+    buf[0] = '[';
+    mini_itoa(get_ticks(), 10, 0, 1, buf+1, 20);
+    buf[21] = ']';
+    buf[22] = '[';
+    for (; *name && ret<33; name++)
+        buf[ret++] = *name;
+    for (; ret<33; )
+        buf[ret++] = ' ';
+    buf[ret++] = ']';
+    buf[ret++] = '[';
+    buf[ret++] = __dict[level];
+    buf[ret++] = ']';
+    buf[ret++] = ' ';
+    buf[ret] = '\0';
+
+    bios_logging(buf);
+
+    va_start(va, fmt);
+    ret = vprintl(fmt, va);
+    va_end(va);
+
+    return ret;
+#endif
+}
+
+void set_loglevel(loglevel_t level) {
+    __level = level;
 }

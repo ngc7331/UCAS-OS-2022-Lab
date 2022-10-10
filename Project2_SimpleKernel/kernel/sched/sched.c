@@ -39,7 +39,7 @@ void do_scheduler(void)
     pcb_t *next = pcb_dequeue(&ready_queue);
     pcb_t *prev = current_running;
 
-    printl("[scheduler] %d.%s -> %d.%s\n", prev->pid, prev->name, next->pid, next->name);
+    logging(LOG_DEBUG, "scheduler", "%d.%s -> %d.%s\n", prev->pid, prev->name, next->pid, next->name);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;
@@ -61,19 +61,17 @@ void do_sleep(uint32_t sleep_time)
     // NOTE: you can assume: 1 second = 1 `timebase` ticks
     // 1. block the current_running
     current_running->status = TASK_BLOCKED;
-    // 2. set the wake up time for the blocked task
-    uint64_t cur_time = get_ticks();
-    current_running->wakeup_time = cur_time + sleep_time * time_base;
-    // 3. reschedule because the current_running is blocked.
-    printl("[timer] block %d.%s at %d, wakeup at %d\n", current_running->pid, current_running->name, cur_time, current_running->wakeup_time);
     pcb_enqueue(&sleep_queue, current_running);
+    // 2. set the wake up time for the blocked task
+    current_running->wakeup_time = get_ticks() + sleep_time * time_base;
+    // 3. reschedule because the current_running is blocked.
+    logging(LOG_INFO, "timer", "block %d.%s until %d\n", current_running->pid, current_running->name, current_running->wakeup_time);
     do_scheduler();
 }
 
 void do_block(pcb_t *pcb, list_head *queue)
 {
     // block the pcb task into the block queue
-    printl("[scheduler] block %d.%s\n", pcb->pid, pcb->name);
     pcb_enqueue(queue, pcb);
     pcb->status = TASK_BLOCKED;
     do_scheduler();
@@ -83,7 +81,6 @@ void do_unblock(list_head *queue)
 {
     // unblock the `pcb` from the block queue
     pcb_t *pcb = pcb_dequeue(queue);
-    printl("[scheduler] unblock %d.%s\n", pcb->pid, pcb->name);
     pcb->status = TASK_READY;
     pcb_enqueue(&ready_queue, pcb);
 }
