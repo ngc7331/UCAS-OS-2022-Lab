@@ -12,6 +12,7 @@
 #include <os/string.h>
 #include <os/task.h>
 #include <os/time.h>
+#include <os/thread.h>
 #include <printk.h>
 #include <screen.h>
 #include <sys/syscall.h>
@@ -24,6 +25,7 @@ extern void ret_from_exception();
 
 // last allocated pid
 int pid_n = 0;
+int pcb_n = 0;
 
 // tasks
 task_info_t apps[APP_MAXNUM];
@@ -85,7 +87,6 @@ static void init_pcb_stack(
     pt_regs->sstatus = SR_SPIE;
 
     pt_regs->sepc = entry_point;
-    pt_regs->regs[1] = entry_point;
     pt_regs->regs[2] = user_stack;
     pt_regs->regs[4] = (reg_t) pcb;
 
@@ -120,20 +121,24 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
 static void init_pcb(void) {
     // load needed tasks and init their corresponding PCB
     for (int i=0; i<appnum; i++) {
+        pcb_t new;
         load_task_img(i, APP);
-        pcb[i].kernel_sp = allocKernelPage(1) + PAGE_SIZE;
-        pcb[i].user_sp = allocUserPage(1) + PAGE_SIZE;
-        pcb[i].pid = ++pid_n;
-        strcpy(pcb[i].name, apps[i].name);
-        pcb[i].cursor_x = pcb[i].cursor_y = 0;
-        pcb[i].status = TASK_READY;
+        new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
+        new.user_sp = allocUserPage(1) + PAGE_SIZE;
+        new.pid = ++pid_n;
+        new.tid = 0;
+        new.type = TYPE_PROCESS;
+        strcpy(new.name, apps[i].name);
+        new.cursor_x = new.cursor_y = 0;
+        new.status = TASK_READY;
 
-        logging(LOG_DEBUG, "init", "load %s as pid=%d\n", pcb[i].name, pcb[i].pid);
-        logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, pcb[i].kernel_sp, pcb[i].user_sp);
+        logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
+        logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, new.kernel_sp, new.user_sp);
 
-        init_pcb_stack(pcb[i].kernel_sp, pcb[i].user_sp, apps[i].entrypoint, &pcb[i]);
+        init_pcb_stack(new.kernel_sp, new.user_sp, apps[i].entrypoint, &new);
 
-        pcb_enqueue(&ready_queue, &pcb[i]);
+        pcb[pcb_n] = new;
+        pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
     }
 
     // set pid0_pcb.kernel_sp
@@ -151,16 +156,17 @@ static void init_pcb(void) {
 static void init_syscall(void) {
     // initialize system call table.
     // see arch/riscv/include/asm/unistd.h
-    syscall[SYSCALL_SLEEP]        = (long (*)())&do_sleep;
-    syscall[SYSCALL_YIELD]        = (long (*)())&do_scheduler;
-    syscall[SYSCALL_WRITE]        = (long (*)())&screen_write;
-    syscall[SYSCALL_CURSOR]       = (long (*)())&screen_move_cursor;
-    syscall[SYSCALL_REFLUSH]      = (long (*)())&screen_reflush;
-    syscall[SYSCALL_GET_TIMEBASE] = (long (*)())&get_time_base;
-    syscall[SYSCALL_GET_TICK]     = (long (*)())&get_ticks;
-    syscall[SYSCALL_LOCK_INIT]    = (long (*)())&do_mutex_lock_init;
-    syscall[SYSCALL_LOCK_ACQ]     = (long (*)())&do_mutex_lock_acquire;
-    syscall[SYSCALL_LOCK_RELEASE] = (long (*)())&do_mutex_lock_release;
+    syscall[SYSCALL_SLEEP]         = (long (*)()) do_sleep;
+    syscall[SYSCALL_YIELD]         = (long (*)()) do_scheduler;
+    syscall[SYSCALL_WRITE]         = (long (*)()) screen_write;
+    syscall[SYSCALL_CURSOR]        = (long (*)()) screen_move_cursor;
+    syscall[SYSCALL_REFLUSH]       = (long (*)()) screen_reflush;
+    syscall[SYSCALL_GET_TIMEBASE]  = (long (*)()) get_time_base;
+    syscall[SYSCALL_GET_TICK]      = (long (*)()) get_ticks;
+    syscall[SYSCALL_LOCK_INIT]     = (long (*)()) do_mutex_lock_init;
+    syscall[SYSCALL_LOCK_ACQ]      = (long (*)()) do_mutex_lock_acquire;
+    syscall[SYSCALL_LOCK_RELEASE]  = (long (*)()) do_mutex_lock_release;
+    syscall[SYSCALL_THREAD_CREATE] = (long (*)()) thread_create;
 }
 
 int main(void) {
@@ -171,7 +177,7 @@ int main(void) {
     init_task_info();
 
     // set log level
-    set_loglevel(LOG_DEBUG);
+    set_loglevel(LOG_INFO);
 
     // Init Process Control Blocks |•'-'•) ✧
     logging(LOG_INFO, "init", "Initialize PCBs...\n");

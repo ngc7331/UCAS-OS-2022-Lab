@@ -32,7 +32,7 @@
 #include <type.h>
 #include <os/list.h>
 
-#define NUM_MAX_TASK 16
+#define NUM_MAX_TASK 128
 
 /* used to save register infomation */
 typedef struct regs_context
@@ -73,6 +73,11 @@ typedef enum {
     TASK_EXITED,
 } task_status_t;
 
+typedef enum {
+    TYPE_PROCESS,
+    TYPE_THREAD
+} pcb_type_t;
+
 /* Process Control Block */
 typedef struct pcb
 {
@@ -84,8 +89,10 @@ typedef struct pcb
     /* previous, next pointer */
     list_node_t list;
 
-    /* process id */
+    /* process id & thread id*/
     pid_t pid;
+    pid_t tid;
+    pcb_type_t type;
 
     /* process name */
     char name[32];
