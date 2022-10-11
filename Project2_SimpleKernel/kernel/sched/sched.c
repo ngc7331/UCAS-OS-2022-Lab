@@ -13,7 +13,8 @@ pcb_t pid0_pcb = {
     .pid = 0,
     .kernel_sp = (ptr_t)pid0_stack,
     .user_sp = (ptr_t)pid0_stack,
-    .name = "init"
+    .name = "init",
+    .status = TASK_RUNNING
 };
 
 LIST_HEAD(ready_queue);
