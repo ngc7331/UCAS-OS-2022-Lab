@@ -138,6 +138,11 @@ static void init_pcb(void) {
 
     // remember to initialize 'current_running'
     current_running = &pid0_pcb;
+    asm volatile(
+        "add tp, %0, zero\n\r"
+        :
+        : "r"(current_running)
+    );
 }
 
 static void init_syscall(void) {
@@ -163,9 +168,10 @@ int main(void) {
     init_task_info();
 
     // set log level
-    set_loglevel(LOG_DEBUG);
+    set_loglevel(LOG_INFO);
 
     // Init Process Control Blocks |•'-'•) ✧
+    logging(LOG_INFO, "init", "Initialize PCBs...\n");
     init_pcb();
     logging(LOG_INFO, "init", "PCB initialization succeeded.\n");
 
@@ -188,18 +194,20 @@ int main(void) {
     init_screen();
     logging(LOG_INFO, "init", "SCREEN initialization succeeded.\n");
 
-    // TODO: [p2-task4] Setup timer interrupt and enable all interrupt globally
+    // Setup timer interrupt and enable all interrupt globally
     // NOTE: The function of sstatus.sie is different from sie's
     enable_interrupt();
+    bios_set_timer(get_ticks() + TIMER_INTERVAL);
+    logging(LOG_INFO, "init", "Timer initialization succeeded & interrupt enabled.\n");
 
     // Infinite while loop, where CPU stays in a low-power state (QAQQQQQQQQQQQ)
     while (1) {
         // If you do non-preemptive scheduling, it's used to surrender control
-        do_scheduler();
+        // do_scheduler();
 
         // If you do preemptive scheduling, they're used to enable CSR_SIE and wfi
-        // enable_preempt();
-        // asm volatile("wfi");
+        enable_preempt();
+        asm volatile("wfi");
     }
 
     return 0;
