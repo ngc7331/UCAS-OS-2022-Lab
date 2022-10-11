@@ -136,6 +136,9 @@ static void init_pcb(void) {
         pcb_enqueue(&ready_queue, &pcb[i]);
     }
 
+    // set pid0_pcb.kernel_sp
+    pid0_pcb.kernel_sp -= sizeof(regs_context_t);
+
     // remember to initialize 'current_running'
     current_running = &pid0_pcb;
     asm volatile(
@@ -168,7 +171,7 @@ int main(void) {
     init_task_info();
 
     // set log level
-    set_loglevel(LOG_INFO);
+    set_loglevel(LOG_DEBUG);
 
     // Init Process Control Blocks |•'-'•) ✧
     logging(LOG_INFO, "init", "Initialize PCBs...\n");
