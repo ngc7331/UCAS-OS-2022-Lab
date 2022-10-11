@@ -97,3 +97,7 @@ void sys_sleep(uint32_t time)
     /* call invoke_syscall to implement sys_sleep */
     invoke_syscall(SYSCALL_SLEEP, time, IGNORE, IGNORE, IGNORE, IGNORE);
 }
+
+void sys_thread_create(uint64_t entrypoint, void *arg) {
+    invoke_syscall(SYSCALL_THREAD_CREATE, entrypoint, (long) arg, IGNORE, IGNORE, IGNORE);
+}
