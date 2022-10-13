@@ -80,10 +80,10 @@ pid_t thread_create(uint64_t entrypoint, void *arg) {
     logging(LOG_INFO, "thread", "%d.%s created new thread, tid=%d\n", new.pid, new.name, new.tid);
     logging(LOG_DEBUG, "thread", "...entrypoint=%ld, arg=%ld\n", entrypoint, (uint64_t) arg);
 
-    disable_preempt();
+    // disable_preempt();
     pcb[pcb_n] = new;
     pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
-    enable_preempt();
+    // enable_preempt();
     return new.tid;
 }
 
@@ -101,15 +101,15 @@ void thread_join(pid_t tid, void **retval) {
     }
 
     // try join
-    disable_preempt();
+    // disable_preempt();
     if (sub->joined != NULL) {
         logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not joinable\n", current_running->pid, current_running->name, tid);
         logging(LOG_DEBUG, "thread", "...sub.joined=%x\n", sub->joined);
-        enable_preempt();
+        // enable_preempt();
         return ;
     }
     sub->joined = current_running;
-    enable_preempt();
+    // enable_preempt();
 
     // wait until sub is exited
     if (sub->status != TASK_EXITED) {

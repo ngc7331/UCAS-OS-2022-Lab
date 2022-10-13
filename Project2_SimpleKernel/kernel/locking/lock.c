@@ -44,14 +44,14 @@ void spin_lock_release(spin_lock_t *lock)
 
 int do_mutex_lock_init(int key)
 {
-    disable_preempt();
+    // disable_preempt();
     // initialize mutex lock
     // key has been allocated with a lock
     for (int i=0; i<LOCK_NUM; i++) {
         if (mlocks[i].key == key) {
             mlocks[i].allocated ++;
             logging(LOG_INFO, "mlock", "key=%d, lock#%d found for %d.%s\n", key, i, current_running->pid, current_running->name);
-            enable_preempt();
+            // enable_preempt();
             return i;
         }
     }
@@ -61,32 +61,32 @@ int do_mutex_lock_init(int key)
             mlocks[i].allocated = 1;
             mlocks[i].key = key;
             logging(LOG_INFO, "mlock", "key=%d, lock#%d allocated for %d.%s\n", key, i, current_running->pid, current_running->name);
-            enable_preempt();
+            // enable_preempt();
             return i;
         }
     }
     // allocate failed
-    enable_preempt();
+    // enable_preempt();
     return -1;
 }
 
 void do_mutex_lock_acquire(int mlock_idx)
 {
-    disable_preempt();
+    // disable_preempt();
     // acquire mutex lock
     if (atomic_swap_d(LOCKED, (ptr_t)&mlocks[mlock_idx].lock.status) == UNLOCKED) {
         logging(LOG_INFO, "mlock", "%d.%s acquire lock#%d successfully\n", current_running->pid, current_running->name, mlock_idx);
-        enable_preempt();
+        // enable_preempt();
     } else {
         logging(LOG_INFO, "mlock", "%d.%s acquire lock#%d failed, block\n", current_running->pid, current_running->name, mlock_idx);
-        enable_preempt();
+        // enable_preempt();
         do_block(current_running, &mlocks[mlock_idx].block_queue);
     }
 }
 
 void do_mutex_lock_release(int mlock_idx)
 {
-    disable_preempt();
+    // disable_preempt();
     // release mutex lock
     if (list_is_empty(&mlocks[mlock_idx].block_queue)) {
         logging(LOG_INFO, "mlock", "%d.%s release lock#%d successfully\n", current_running->pid, current_running->name, mlock_idx);
@@ -95,5 +95,5 @@ void do_mutex_lock_release(int mlock_idx)
         logging(LOG_INFO, "mlock", "%d.%s release lock#%d successfully, unblock a process from queue\n", current_running->pid, current_running->name, mlock_idx);
         do_unblock(&mlocks[mlock_idx].block_queue);
     }
-    enable_preempt();
+    // enable_preempt();
 }
