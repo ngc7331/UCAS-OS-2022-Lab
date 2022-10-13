@@ -99,24 +99,32 @@ void thread_join(pid_t tid, void **retval) {
         logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not found\n", current_running->pid, current_running->name, tid);
         return ;
     }
-    // sub is already joined
+
+    // try join
+    disable_preempt();
     if (sub->joined != NULL) {
         logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not joinable\n", current_running->pid, current_running->name, tid);
         logging(LOG_DEBUG, "thread", "...sub.joined=%x\n", sub->joined);
+        enable_preempt();
         return ;
     }
+    sub->joined = current_running;
+    enable_preempt();
 
-    // join
+    // wait until sub is exited
     if (sub->status != TASK_EXITED) {
         logging(LOG_INFO, "thread", "%d.%s waiting for thread %d\n", current_running->pid, current_running->name, tid);
-        sub->joined = current_running;
         current_running->status = TASK_BLOCKED;
         do_scheduler();
     }
 
     // return
-    logging(LOG_INFO, "thread", "%d.%s get thread %d's retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
-    *retval = sub->retval;
+    if (retval != NULL) {
+        logging(LOG_INFO, "thread", "%d.%s join thread %d complete, get retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
+        *retval = sub->retval;
+    } else {
+        logging(LOG_INFO, "thread", "%d.%s join thread %d complete\n", current_running->pid, current_running->name, tid);
+    }
 }
 
 void thread_exit(void *retval) {

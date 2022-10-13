@@ -36,7 +36,7 @@ int main() {
     int print_location = 6;
     int sum = 0;
     int tid[THREAD_NUM];
-    int retval[THREAD_NUM];
+    void *retval[THREAD_NUM];
 
     for (int i=0; i<N; i++) {
         sys_move_cursor(0, print_location);
@@ -57,18 +57,22 @@ int main() {
     printf(blank);
     for (int i=0; i<THREAD_NUM; i++) {
         sys_move_cursor(0, print_location);
-        printf("> [TASK] main thread: waiting for thread#%d\n", sum, i);
-        sys_thread_join(tid[i], (void **) &retval[i]);
+        printf("> [TASK] main thread: waiting for thread#%d\n", i);
+        sys_thread_join(tid[i], &retval[i]);
     }
 
     // test
-    sys_thread_join(0, (void **) 0);
-    sys_thread_join(1, (void **) 0);
+    sys_thread_join(0, (void **) 0);   // not joinable
+    sys_thread_join(10, (void **) 0);  // tid invalid
+
+    // sum all
+    for (int i=0; i<THREAD_NUM; i++) {
+        sys_move_cursor(0, print_location);
+        printf("> [TASK] main thread: sum a threads (%d/%d)\n", i, THREAD_NUM);
+        sum += (int) ((long) retval[i]);
+    }
 
     // done
-    for (int i=0; i<THREAD_NUM; i++) {
-        sum += retval[i];
-    }
     sys_move_cursor(0, print_location);
     printf(blank);
     sys_move_cursor(0, print_location);
