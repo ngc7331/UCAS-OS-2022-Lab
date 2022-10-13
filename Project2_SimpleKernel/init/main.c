@@ -167,6 +167,8 @@ static void init_syscall(void) {
     syscall[SYSCALL_LOCK_ACQ]      = (long (*)()) do_mutex_lock_acquire;
     syscall[SYSCALL_LOCK_RELEASE]  = (long (*)()) do_mutex_lock_release;
     syscall[SYSCALL_THREAD_CREATE] = (long (*)()) thread_create;
+    syscall[SYSCALL_THREAD_JOIN]   = (long (*)()) thread_join;
+    syscall[SYSCALL_THREAD_EXIT]   = (long (*)()) thread_exit;
 }
 
 int main(void) {

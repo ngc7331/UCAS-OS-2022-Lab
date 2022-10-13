@@ -107,6 +107,9 @@ typedef struct pcb
     /* time(seconds) to wake up sleeping PCB */
     uint64_t wakeup_time;
 
+    /* return value */
+    void *retval;
+
 } pcb_t;
 
 /* ready queue to run */

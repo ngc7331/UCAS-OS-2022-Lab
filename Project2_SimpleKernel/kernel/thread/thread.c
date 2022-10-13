@@ -58,7 +58,7 @@ static int newtid() {
     return 0;
 }
 
-void thread_create(uint64_t entrypoint, void *arg) {
+pid_t thread_create(uint64_t entrypoint, void *arg) {
     pcb_t new;
     regs_context_t regs;
     regs.regs[10] = (reg_t) arg;
@@ -79,4 +79,32 @@ void thread_create(uint64_t entrypoint, void *arg) {
 
     pcb[pcb_n] = new;
     pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
+    return new.tid;
+}
+
+void thread_join(pid_t tid, void **retval) {
+    pcb_t *sub;
+    for (int i=0; i<pcb_n; i++) {
+        if (pcb[i].pid == current_running->pid && pcb[i].type == TYPE_THREAD && pcb[i].tid == tid)
+            sub = &pcb[i];
+    }
+    /* FIXME:
+     * for now, just do_scheduler() until sub is exited
+     * is that possible to block current_running and unblock it when sub calls thread_exit()?
+    */
+    logging(LOG_INFO, "thread", "%d.%s waiting for %d\n", current_running->pid, current_running->name, tid);
+    while (sub->status != TASK_EXITED) {
+        do_scheduler();
+    }
+
+    logging(LOG_INFO, "thread", "%d.%s get %d's retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
+    *retval = sub->retval;
+}
+
+void thread_exit(void *retval) {
+    logging(LOG_INFO, "thread", "%d.%s.%d exited, retval=%ld\n", current_running->pid, current_running->name, current_running->tid, (long) retval);
+    current_running->retval = retval;
+    current_running->status = TASK_EXITED;
+    // FIXME: garbage collecter?
+    do_scheduler();
 }

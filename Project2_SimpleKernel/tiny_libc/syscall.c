@@ -98,6 +98,14 @@ void sys_sleep(uint32_t time)
     invoke_syscall(SYSCALL_SLEEP, time, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
-void sys_thread_create(uint64_t entrypoint, void *arg) {
-    invoke_syscall(SYSCALL_THREAD_CREATE, entrypoint, (long) arg, IGNORE, IGNORE, IGNORE);
+int sys_thread_create(uint64_t entrypoint, void *arg) {
+    return invoke_syscall(SYSCALL_THREAD_CREATE, entrypoint, (long) arg, IGNORE, IGNORE, IGNORE);
+}
+
+void sys_thread_join(int tid, void **retval) {
+    invoke_syscall(SYSCALL_THREAD_JOIN, tid, (long) retval, IGNORE, IGNORE, IGNORE);
+}
+
+void sys_thread_exit(void *retval) {
+    invoke_syscall(SYSCALL_THREAD_EXIT, (long) retval, IGNORE, IGNORE, IGNORE, IGNORE);
 }

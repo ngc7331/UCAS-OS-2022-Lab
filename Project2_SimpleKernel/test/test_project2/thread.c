@@ -6,13 +6,12 @@
 #define THREAD_NUM 4
 #define STEP (N/THREAD_NUM)
 
-int retval[THREAD_NUM];
 int arr[N];
 
 static char blank[] = {"                                                                   "};
 
 void worker(void *arg) {
-    int self = (int) arg;
+    int self = (int)((long) arg);
     int print_location = 7 + self;
     int sum = 0;
     int base = self * STEP;
@@ -20,7 +19,7 @@ void worker(void *arg) {
     // add
     for (int i=0; i<STEP; i++) {
         sys_move_cursor(0, print_location);
-        printf(">        thread#%d   : add (%d/%d)\n", self, i, STEP);
+        printf(">        thread#%d   : add (%d/%d), partsum=%d\n", self, i, STEP, sum);
         sum += arr[i+base];
     }
 
@@ -29,14 +28,15 @@ void worker(void *arg) {
     printf(blank);
     sys_move_cursor(0, print_location);
     printf(">        thread#%d   : done, sum=%d\n", self, sum);
-    retval[self] = sum;
 
-    while (1) sys_yield();
+    sys_thread_exit((void *)((long) sum));
 }
 
 int main() {
     int print_location = 6;
     int sum = 0;
+    int tid[THREAD_NUM];
+    int retval[THREAD_NUM];
 
     for (int i=0; i<N; i++) {
         sys_move_cursor(0, print_location);
@@ -49,18 +49,16 @@ int main() {
     sys_move_cursor(0, print_location);
     printf("> [TASK] main thread: create threads, %ld\n", (uint64_t) worker);
     for (int i=0; i<THREAD_NUM; i++) {
-        sys_thread_create((uint64_t) worker, (void *) i);
+        tid[i] = sys_thread_create((uint64_t) worker, (void *)((long) i));
     }
 
     // wait until threads done
     sys_move_cursor(0, print_location);
     printf(blank);
     for (int i=0; i<THREAD_NUM; i++) {
-        while (!retval[i]) {
-            sys_move_cursor(0, print_location);
-            printf("> [TASK] main thread: waiting for thread#%d\n", sum, i);
-            sys_yield();
-        }
+        sys_move_cursor(0, print_location);
+        printf("> [TASK] main thread: waiting for thread#%d\n", sum, i);
+        sys_thread_join(tid[i], (void **) &retval[i]);
     }
 
     // done
