@@ -1,4 +1,5 @@
 #include <csr.h>
+#include <os/irq.h>
 #include <os/mm.h>
 #include <os/sched.h>
 #include <os/string.h>
@@ -49,11 +50,11 @@ static void init_pcb_stack(
 
 static int newtid() {
     if (current_running->type == TYPE_PROCESS) {
-        return ++current_running->tid;
+        return current_running->tid++;
     }
     for (int i=0; i<=pcb_n; i++) {
         if (pcb[i].pid == current_running->pid && pcb[i].type == TYPE_PROCESS)
-            return ++pcb[i].tid;
+            return pcb[i].tid++;
     }
     return 0;
 }
@@ -71,40 +72,64 @@ pid_t thread_create(uint64_t entrypoint, void *arg) {
     new.cursor_x = current_running->cursor_x;
     new.cursor_y = current_running->cursor_y;
     new.status = TASK_READY;
+    new.retval = NULL;
+    new.joined = NULL;
 
     init_pcb_stack(new.kernel_sp, new.user_sp, entrypoint, &new, regs);
 
     logging(LOG_INFO, "thread", "%d.%s created new thread, tid=%d\n", new.pid, new.name, new.tid);
     logging(LOG_DEBUG, "thread", "...entrypoint=%ld, arg=%ld\n", entrypoint, (uint64_t) arg);
 
+    disable_preempt();
     pcb[pcb_n] = new;
     pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
+    enable_preempt();
     return new.tid;
 }
 
 void thread_join(pid_t tid, void **retval) {
-    pcb_t *sub;
+    // find sub by tid
+    pcb_t *sub = NULL;
     for (int i=0; i<pcb_n; i++) {
         if (pcb[i].pid == current_running->pid && pcb[i].type == TYPE_THREAD && pcb[i].tid == tid)
             sub = &pcb[i];
     }
-    /* FIXME:
-     * for now, just do_scheduler() until sub is exited
-     * is that possible to block current_running and unblock it when sub calls thread_exit()?
-    */
-    logging(LOG_INFO, "thread", "%d.%s waiting for %d\n", current_running->pid, current_running->name, tid);
-    while (sub->status != TASK_EXITED) {
+    // invalid tid
+    if (sub == NULL) {
+        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not found\n", current_running->pid, current_running->name, tid);
+        return ;
+    }
+    // sub is already joined
+    if (sub->joined != NULL) {
+        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not joinable\n", current_running->pid, current_running->name, tid);
+        logging(LOG_DEBUG, "thread", "...sub.joined=%x\n", sub->joined);
+        return ;
+    }
+
+    // join
+    if (sub->status != TASK_EXITED) {
+        logging(LOG_INFO, "thread", "%d.%s waiting for thread %d\n", current_running->pid, current_running->name, tid);
+        sub->joined = current_running;
+        current_running->status = TASK_BLOCKED;
         do_scheduler();
     }
 
-    logging(LOG_INFO, "thread", "%d.%s get %d's retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
+    // return
+    logging(LOG_INFO, "thread", "%d.%s get thread %d's retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
     *retval = sub->retval;
 }
 
 void thread_exit(void *retval) {
     logging(LOG_INFO, "thread", "%d.%s.%d exited, retval=%ld\n", current_running->pid, current_running->name, current_running->tid, (long) retval);
+    // wake up joined task
+    if (current_running->joined != NULL) {
+        current_running->joined->status = TASK_READY;
+        pcb_enqueue(&ready_queue, current_running->joined);
+    }
     current_running->retval = retval;
     current_running->status = TASK_EXITED;
+
     // FIXME: garbage collecter?
+
     do_scheduler();
 }

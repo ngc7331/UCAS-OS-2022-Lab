@@ -131,6 +131,8 @@ static void init_pcb(void) {
         strcpy(new.name, apps[i].name);
         new.cursor_x = new.cursor_y = 0;
         new.status = TASK_READY;
+        new.retval = NULL;
+        new.joined = NULL;
 
         logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
         logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, new.kernel_sp, new.user_sp);

@@ -61,6 +61,10 @@ int main() {
         sys_thread_join(tid[i], (void **) &retval[i]);
     }
 
+    // test
+    sys_thread_join(0, (void **) 0);
+    sys_thread_join(1, (void **) 0);
+
     // done
     for (int i=0; i<THREAD_NUM; i++) {
         sum += retval[i];

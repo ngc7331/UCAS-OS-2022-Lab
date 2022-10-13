@@ -89,7 +89,14 @@ typedef struct pcb
     /* previous, next pointer */
     list_node_t list;
 
-    /* process id & thread id*/
+    /* process id & thread id
+     * for TYPE_PROCESS:
+     *   pid is valid
+     *   tid = last allocated tid + 1
+     * for TYPE_THREAD:
+     *   pid = parent's pid
+     *   tid is valid
+     */
     pid_t pid;
     pid_t tid;
     pcb_type_t type;
@@ -109,6 +116,11 @@ typedef struct pcb
 
     /* return value */
     void *retval;
+
+    /* who joined this process / thread
+     * should be initialized as NULL
+     */
+    struct pcb *joined;
 
 } pcb_t;
 
