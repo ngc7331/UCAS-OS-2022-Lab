@@ -107,8 +107,6 @@ libs/list.c 的头文件，需要特殊说明两个宏如下：
 3. 返回到`ret_from_exception()`
 ##### kernel/irq/irq.c: interrupt_helper()
 根据 scause 查找并调用对应 handler
-##### kernel/irq/irq.c: handle_irq_timer()
-处理时钟中断：设置下次中断的时间为现在的时间+INTERVAL；调用调度器
 ##### kernel/syscall/syscall.c: handle_syscall()
 1. 从内核栈读取系统调用号和参数
 2. 查系统调用表并调用对应 function，将返回值存入内核栈
@@ -121,13 +119,103 @@ libs/list.c 的头文件，需要特殊说明两个宏如下：
 2. sret，返回用户态
 
 #### 进程切换
-TODO
+在 [part1](#archriscvkernelentrys) 设计的`switch_to`中，为了应对第一次从内核进入用户程序时的特殊情况，我采取了一些不太严谨的处理方式，即默认每次进入`switch_to`时 switch_to_context 紧接在 pt_regs 后，且 sp 指向两者之间，即
+```
+| pt_regs | switch_to_context |
+          sp
+```
+
+当时内核栈仅用于保存 switch_to_context，因此不会产生问题，但后半部分，内核栈还需要保存内核态的中断处理程序等函数调用栈帧，即
+```
+| pt_regs | interrupt_helper() | handle_syscall() | ... | switch_to_context |
+                                                                            sp
+```
+
+沿用旧的逻辑会导致上次保存的 switch_to_context 被调用栈帧覆盖，产生错误
+
+此外，part1 中由`switch_to`负责内核栈与用户栈的切换，但 part2 中在进入`exception_handler_entry`和返回`ret_from_exception`时，会调用`SAVE_CONTEXT`和`RESTORE_CONTEXT`宏，其中包括了内核栈与用户栈的切换及 sp 的保存与恢复，无需`switch_to`处理
+
+因此新的逻辑应该是：
+1. 开出保存 switch_to_context 的栈空间，即`sp -= SWITCH_TO_SIZE`
+2. 保存sp、ra、s0~s11
+3. 切换到后一pcb的内核栈
+4. 载入sp、ra、s0~s11
+5. 恢复栈空间，即`sp += SWITCH_TO_SIZE`
+6. 修改tp为新的`current_running`
+
 #### sleep
-TODO
+##### kernel/sched/sched.c: do_sleep()
+1. 将当前进程设为阻塞态，加入`sleep_queqe`
+2. 设置当前进程的唤醒时间`wakeup_time = current_time + sleep_time`
+3. 调度
+#### kernel/sched/time.c: check_sleeping()
+遍历`sleep_queqe`，对每一个进程：
+1. 检查是否到达唤醒时间
+2. 若是，设为就绪态，从`sleep_queqe`删除，加入`ready_queqe`
+3. 若否，检查下一个进程
+
+`do_scheduler()`的开始需要调用`check_sleeping()`
+
 #### 抢占式调度
-TODO
+##### init/main.c: main()
+1. 启用中断：`enable_interrupt(); enable_preempt();`，两者分别拉高了 sstatus 寄存器的 SIE 位和 sie 寄存器的所有位
+2. 设置时钟：`bios_set_timer(get_ticks() + TIMER_INTERVAL);`
+##### kernel/irq/irq.c: handle_irq_timer()
+处理时钟中断：设置下次中断的时间为现在的时间+INTERVAL；调用调度器
+
 #### 线程
-TODO
+##### pcb
+线程复用进程的 pcb 结构，复用调度器、`switch_to`、`init_pcb_stack()`等逻辑，需要对 pcb 进行一些修改
+
+新增 tid 域、type 域，用于记录线程 id 和 pcb 类型
+
+新增 joined 域、retval 域，用于支持`thread_join()`和`thread_exit()`中阻塞等待子线程退出、线程退出传递返回值的功能
+
+##### pid & tid
+pid 保证对于进程唯一，一个进程的所有子线程 pid 相同
+tid 保证对于线程唯一，进程中的主线程的 tid 为最后一次分配的 tid + 1
+
+##### kernel/thread/thread.c: thread_create()
+基本复用`init_pcb()`的逻辑：
+- 分配内核栈与用户栈空间
+- 分配新的 tid
+- 设置类型为`TYPE_THREAD`
+- 复制父线程的 pid、name、cursor
+- 设置为就绪态
+- 设置 joined 域、retval 域为 NULL
+- 将输入参数`arg`放入初始化的`pt_regs`的 a0 处，将参数传递给子线程
+- 初始化内核栈
+- 将新的 pcb 加入`ready_queqe`
+- 返回 tid
+
+##### kernel/thread/thread.c: new_tid()
+分配新的 tid：
+1. 遍历所有 pcb，找到 pid 相同，且类型为`TYPE_PROCESS`的 pcb，即为父进程（主线程）
+2. 将父进程的 tid + 1，返回原值
+
+##### kernel/thread/thread.c: thread_join()
+等待 tid 指示的子线程退出（必须主动调用`thread_exit()`），将返回值存入 retval 指示的内存地址
+1. 遍历 pcb 数组找到 tid 指示的 pcb（下称为 sub），若未找到，报错并返回
+2. 若 sub 已经被 join 过（`joined != NULL`），报错并返回
+3. join，即将当前进程的 pcb 地址存入 sub 的 joined 域以便 sub 退出时唤醒
+4. 若 sub 未退出，阻塞并调度
+5. 从 sub 的 retval 域读取返回值，写入 retval 指示的内存地址（若`retval == NULL`则跳过此步）
+6. 返回
+
+##### kernel/thread/thread.c: thread_exit()
+子线程退出，将返回值存入 pcb
+1. 若自己被其它线程 join（`joined != NULL`），唤醒该线程
+2. 将状态设为`TASK_EXITED`
+3. 也许未来实现内存的回收（内核栈及用户栈）
+4. 调度
+
+##### 用户程序 test/test_project2/thread.c
+1. 主线程填充全局数组`arr[i] = i+1`
+2. 主线程创建`THREAD_N`个子线程
+3. 第 k 个子线程计算`[N*k/THREAD_NUM, N*(k+1)/THREAD_NUM)`区间的和，调用`sys_thread_exit()`退出并传递和
+4. 主线程等待所有子线程退出，求和并打印
+5. 死循环
+
 #### 其它设计
 ##### libs/printk.c: logging() & set_loglevel()
 对`printl`/`qemu_logging`的封装。按照等级输出格式化的内核日志信息
