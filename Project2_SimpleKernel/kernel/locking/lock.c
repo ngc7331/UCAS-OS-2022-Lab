@@ -50,7 +50,7 @@ int do_mutex_lock_init(int key)
     for (int i=0; i<LOCK_NUM; i++) {
         if (mlocks[i].key == key) {
             mlocks[i].allocated ++;
-            logging(LOG_INFO, "mlock", "key=%d, lock#%d found\n", key, i);
+            logging(LOG_INFO, "mlock", "key=%d, lock#%d found for %d.%s\n", key, i, current_running->pid, current_running->name);
             enable_preempt();
             return i;
         }
@@ -60,7 +60,7 @@ int do_mutex_lock_init(int key)
         if (mlocks[i].allocated == 0) {
             mlocks[i].allocated = 1;
             mlocks[i].key = key;
-            logging(LOG_INFO, "mlock", "key=%d, lock#%d allocated\n", key, i);
+            logging(LOG_INFO, "mlock", "key=%d, lock#%d allocated for %d.%s\n", key, i, current_running->pid, current_running->name);
             enable_preempt();
             return i;
         }
@@ -74,12 +74,11 @@ void do_mutex_lock_acquire(int mlock_idx)
 {
     disable_preempt();
     // acquire mutex lock
-    logging(LOG_INFO, "mlock", "acquire lock#%d...\n", mlock_idx);
     if (atomic_swap_d(LOCKED, (ptr_t)&mlocks[mlock_idx].lock.status) == UNLOCKED) {
-        logging(LOG_INFO, "mlock", "...success\n");
+        logging(LOG_INFO, "mlock", "%d.%s acquire lock#%d successfully\n", current_running->pid, current_running->name, mlock_idx);
         enable_preempt();
     } else {
-        logging(LOG_INFO, "mlock", "...failed, block\n");
+        logging(LOG_INFO, "mlock", "%d.%s acquire lock#%d failed, block\n", current_running->pid, current_running->name, mlock_idx);
         enable_preempt();
         do_block(current_running, &mlocks[mlock_idx].block_queue);
     }
@@ -89,12 +88,11 @@ void do_mutex_lock_release(int mlock_idx)
 {
     disable_preempt();
     // release mutex lock
-    logging(LOG_INFO, "mlock", "release lock#%d...\n", mlock_idx);
     if (list_is_empty(&mlocks[mlock_idx].block_queue)) {
-        logging(LOG_INFO, "mlock", "success\n");
+        logging(LOG_INFO, "mlock", "%d.%s release lock#%d successfully\n", current_running->pid, current_running->name, mlock_idx);
         mlocks[mlock_idx].lock.status = UNLOCKED;
     } else {
-        logging(LOG_INFO, "mlock", "success, unblock a process from queue\n");
+        logging(LOG_INFO, "mlock", "%d.%s release lock#%d successfully, unblock a process from queue\n", current_running->pid, current_running->name, mlock_idx);
         do_unblock(&mlocks[mlock_idx].block_queue);
     }
     enable_preempt();
