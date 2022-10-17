@@ -75,6 +75,7 @@ int main(void)
             sys_move_cursor(0, print_location);
             printf("> [TASK] Has acquired lock and running.(%d)\n", i);
             // sys_yield();
+            sys_sleep(1);
         }
 
         sys_move_cursor(0, print_location);

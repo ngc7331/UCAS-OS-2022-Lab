@@ -21,6 +21,10 @@ int main(void)
 {
     int print_location = 0;
 
+    // test fail
+    // void (*a)() = (void(*)()) 0x50200000;
+    // a();
+
     for (int i = 0;; i++)
     {
         sys_move_cursor(0, print_location);
