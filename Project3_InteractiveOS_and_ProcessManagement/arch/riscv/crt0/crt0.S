@@ -29,6 +29,7 @@ clend:
     addi sp, sp, 8
     jr    ra
 
+    /* TODO: [P3] call sys_exit */
 
 // while(1) loop, unreachable here
 loop:
