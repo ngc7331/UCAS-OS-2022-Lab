@@ -140,6 +140,7 @@ extern pid_t process_id;
 extern pcb_t pcb[NUM_MAX_TASK];
 extern pcb_t pid0_pcb;
 extern const ptr_t pid0_stack;
+extern int pcb_n;
 
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
@@ -148,7 +149,7 @@ void do_sleep(uint32_t);
 void do_block(pcb_t *, list_head *queue);
 void do_unblock(list_node_t *);
 
-/* TODO [P3-TASK1] exec exit kill waitpid ps*/
+/* exec exit kill waitpid ps*/
 #ifdef S_CORE
 extern pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else

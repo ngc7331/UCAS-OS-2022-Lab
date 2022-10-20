@@ -111,3 +111,35 @@ void strrev(char *str)
         str[j] = tmp;
     }
 }
+
+static int is_space(char c) {
+    return c == ' ' || c == '\t';
+}
+
+// remove spaces from left end
+int lstrip(char *s) {
+    char *tmp = s;
+    int len = 0;
+    while (is_space(*s)) s++;
+    for (; *s; len++, s++)
+        tmp[len] = *s;
+    tmp[len] = '\0';
+    return len;
+}
+
+// remove spaces from right end
+int rstrip(char *s) {
+    char *tmp = s;
+    int len = -1;
+    for (int i=0; *s; i++, s++)
+        if (!is_space(*s))
+            len = i;
+    tmp[len+1] = '\0';
+    return len+1;
+}
+
+// remove spaces from both end
+int strip(char *s) {
+    lstrip(s);
+    return rstrip(s);
+}

@@ -27,27 +27,98 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
 
 #define SHELL_BEGIN 20
+#define BUFSIZE 64
+#define HISTSIZE 16
 
-int main(void)
-{
+static char getchar();
+static char parsechar();
+static int getline(char buf[], int bufsize);
+
+int lineno;
+
+static void init_shell() {
     sys_move_cursor(0, SHELL_BEGIN);
     printf("------------------- COMMAND -------------------\n");
-    printf("> root@UCAS_OS: ");
+    lineno = SHELL_BEGIN;
+}
+
+int main(void) {
+    init_shell();
+
+    char history[HISTSIZE][BUFSIZE];
+    char buf[BUFSIZE];
+    int hp = 0;
 
     while (1)
     {
-        // TODO [P3-task1]: call syscall to read UART port
-        
-        // TODO [P3-task1]: parse input
-        // note: backspace maybe 8('\b') or 127(delete)
+        printf("> root@UCAS_OS: ");
+        // call syscall to read UART port & parse input
+        int len = getline(buf, BUFSIZE);
+        len = strip(buf);
+        // record history for later use
+        strncpy(history[hp++], buf, len);
+        if (hp == HISTSIZE) hp = 0;
 
-        // TODO [P3-task1]: ps, exec, kill, clear        
+        // ps, exec, kill, clear
+        if (strncmp("ps", buf, 1) == 0) {
+            sys_ps();
+        } else if (strncmp("clear", buf, 4) == 0) {
+            sys_clear();
+            init_shell();
+        } else if (strncmp("exec", buf, 3) == 0) {
+            // TODO: implement exec
+            printf("exec not implemented\n");
+        } else if (strncmp("kill", buf, 3) == 0) {
+            lstrip(buf+4);
+            pid_t pid = atoi(buf+4);
+            sys_kill(pid);
+        } else {
+            printf("Command not found\n");
+        }
     }
-
     return 0;
+}
+
+static char getchar() {
+    int ch;
+    while ((ch=sys_getchar()) == -1);
+    return ch;
+}
+
+// parse special chars & echo on screen
+static char parsechar() {
+    char ch = getchar();
+    // echo
+    switch (ch) {
+    case '\b': case 127:   // backspace
+        // FIXME
+        ch = '\b';
+        break;
+    case '\n': case '\r':  // new line
+        sys_write("\n");
+        ch = '\n';
+        break;
+    case '\033':           // control, dont echo
+        break;
+    default:               // echo
+        char buf[2] = {ch, "0"};
+        sys_write(buf);
+    }
+    return ch;
+}
+
+static int getline(char buf[], int bufsize) {
+    int len = 0;
+    char ch;
+    while ((ch=parsechar()) != '\n' && len < bufsize-1) {
+        buf[len++] = ch;
+    }
+    buf[len] = '\0';
+    return len;
 }

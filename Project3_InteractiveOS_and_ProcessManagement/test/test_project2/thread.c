@@ -35,7 +35,7 @@ void worker(void *arg) {
 int main() {
     int print_location = 6;
     int sum = 0;
-    int tid[THREAD_NUM];
+    pid_t tid[THREAD_NUM];
     void *retval[THREAD_NUM];
 
     for (int i=0; i<N; i++) {

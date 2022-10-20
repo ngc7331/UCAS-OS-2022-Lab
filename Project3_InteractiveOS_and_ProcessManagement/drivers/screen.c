@@ -34,6 +34,13 @@ static void vt100_hidden_cursor()
     printv("%c[?25l", 27);
 }
 
+/* display cursor */
+static void vt100_display_cursor()
+{
+    // \033[?25h
+    printv("%c[?25h", 27);
+}
+
 /* write a char */
 static void screen_write_ch(char ch)
 {

@@ -14,4 +14,8 @@ char *strcat(char *dest, const char *src);
 int strlen(const char *src);
 void strrev(char *str);
 
+int lstrip(char *s);
+int rstrip(char *s);
+int strip(char *s);
+
 #endif

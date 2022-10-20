@@ -118,35 +118,36 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
     return pcb;
 }
 
-static void init_pcb(void) {
+static void init_pcb(char *name) {
     // load needed tasks and init their corresponding PCB
-    for (int i=0; i<appnum; i++) {
-        pcb_t new;
-        load_task_img(i, APP);
-        new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
-        new.user_sp = allocUserPage(1) + PAGE_SIZE;
-        new.pid = ++pid_n;
-        new.tid = 0;
-        new.type = TYPE_PROCESS;
-        strcpy(new.name, apps[i].name);
-        new.cursor_x = new.cursor_y = 0;
-        new.status = TASK_READY;
-        new.retval = NULL;
-        new.joined = NULL;
+    int id = get_taskid_by_name(name, APP);
+    pcb_t new;
+    load_task_img(id, APP);
+    new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
+    new.user_sp = allocUserPage(1) + PAGE_SIZE;
+    new.pid = ++pid_n;
+    new.tid = 0;
+    new.type = TYPE_PROCESS;
+    strcpy(new.name, apps[id].name);
+    new.cursor_x = new.cursor_y = 0;
+    new.status = TASK_READY;
+    new.retval = NULL;
+    new.joined = NULL;
 
-        logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
-        logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[i].entrypoint, new.kernel_sp, new.user_sp);
+    logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
+    logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, new.kernel_sp, new.user_sp);
 
-        init_pcb_stack(new.kernel_sp, new.user_sp, apps[i].entrypoint, &new);
+    init_pcb_stack(new.kernel_sp, new.user_sp, apps[id].entrypoint, &new);
 
-        pcb[pcb_n] = new;
-        pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
-    }
+    pcb[pcb_n] = new;
+    pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
+}
 
+static void init_pcb0(void) {
     // set pid0_pcb.kernel_sp
     pid0_pcb.kernel_sp -= sizeof(regs_context_t);
 
-    // remember to initialize 'current_running'
+    // initialize 'current_running'
     current_running = &pid0_pcb;
     asm volatile(
         "add tp, %0, zero\n\r"
@@ -158,16 +159,37 @@ static void init_pcb(void) {
 static void init_syscall(void) {
     // initialize system call table.
     // see arch/riscv/include/asm/unistd.h
+    syscall[SYSCALL_EXEC]          = (long (*)()) do_exec;
+    syscall[SYSCALL_EXIT]          = (long (*)()) do_exit;
     syscall[SYSCALL_SLEEP]         = (long (*)()) do_sleep;
+    syscall[SYSCALL_KILL]          = (long (*)()) do_kill;
+    syscall[SYSCALL_WAITPID]       = (long (*)()) do_waitpid;
+    syscall[SYSCALL_PS]            = (long (*)()) do_process_show;
+    syscall[SYSCALL_GETPID]        = (long (*)()) do_getpid;
     syscall[SYSCALL_YIELD]         = (long (*)()) do_scheduler;
     syscall[SYSCALL_WRITE]         = (long (*)()) screen_write;
+    syscall[SYSCALL_READCH]        = (long (*)()) bios_getchar;
     syscall[SYSCALL_CURSOR]        = (long (*)()) screen_move_cursor;
     syscall[SYSCALL_REFLUSH]       = (long (*)()) screen_reflush;
+    syscall[SYSCALL_CLEAR]         = (long (*)()) screen_clear;
     syscall[SYSCALL_GET_TIMEBASE]  = (long (*)()) get_time_base;
     syscall[SYSCALL_GET_TICK]      = (long (*)()) get_ticks;
     syscall[SYSCALL_LOCK_INIT]     = (long (*)()) do_mutex_lock_init;
     syscall[SYSCALL_LOCK_ACQ]      = (long (*)()) do_mutex_lock_acquire;
     syscall[SYSCALL_LOCK_RELEASE]  = (long (*)()) do_mutex_lock_release;
+    // syscall[SYSCALL_SHOW_TASK]     = (long (*)()) do_process_show;  // FIXME?
+    // syscall[SYSCALL_BARR_INIT]     = (long (*)()) do_barrier_init
+    // syscall[SYSCALL_BARR_WAIT]     = (long (*)()) do_barrier_wait;
+    // syscall[SYSCALL_BARR_DESTROY]  = (long (*)()) do_barrier_destroy;
+    // syscall[SYSCALL_COND_INIT]     = (long (*)()) do_condition_init;
+    // syscall[SYSCALL_COND_WAIT]     = (long (*)()) do_condition_wait;
+    // syscall[SYSCALL_COND_SIGNAL]   = (long (*)()) do_condition_signal;
+    // syscall[SYSCALL_COND_BROADCAST]= (long (*)()) do_condition_broadcast;
+    // syscall[SYSCALL_COND_DESTROY]  = (long (*)()) do_condition_destroy;
+    // syscall[SYSCALL_MBOX_OPEN]     = (long (*)()) do_mbox_open;
+    // syscall[SYSCALL_MBOX_CLOSE]    = (long (*)()) do_mbox_close;
+    // syscall[SYSCALL_MBOX_SEND]     = (long (*)()) do_mbox_send;
+    // syscall[SYSCALL_MBOX_RECV]     = (long (*)()) do_mbox_recv;
     syscall[SYSCALL_THREAD_CREATE] = (long (*)()) thread_create;
     syscall[SYSCALL_THREAD_JOIN]   = (long (*)()) thread_join;
     syscall[SYSCALL_THREAD_EXIT]   = (long (*)()) thread_exit;
@@ -181,12 +203,13 @@ int main(void) {
     init_task_info();
 
     // set log level
-    set_loglevel(LOG_INFO);
+    set_loglevel(LOG_VERBOSE);
 
     // Init Process Control Blocks |•'-'•) ✧
-    logging(LOG_INFO, "init", "Initialize PCBs...\n");
-    init_pcb();
-    logging(LOG_INFO, "init", "PCB initialization succeeded.\n");
+    init_pcb0();
+    logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+    init_pcb("shell");
+    logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
     // Read CPU frequency (｡•ᴗ-)_
     time_base = bios_read_fdt(TIMEBASE);

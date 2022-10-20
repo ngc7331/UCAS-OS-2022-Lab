@@ -1,11 +1,13 @@
 #include <os/list.h>
 #include <os/lock.h>
 #include <os/sched.h>
+#include <os/string.h>
 #include <os/time.h>
 #include <os/mm.h>
 #include <screen.h>
 #include <printk.h>
 #include <assert.h>
+#include <printk.h>
 
 pcb_t pcb[NUM_MAX_TASK];
 const ptr_t pid0_stack = INIT_KERNEL_STACK + PAGE_SIZE;
@@ -84,4 +86,46 @@ void do_unblock(list_head *queue)
     pcb_t *pcb = pcb_dequeue(queue);
     pcb->status = TASK_READY;
     pcb_enqueue(&ready_queue, pcb);
+}
+
+#ifdef S_CORE
+pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+    // TODO
+}
+#else
+pid_t do_exec(char *name, int argc, char *argv[]) {
+    // TODO
+    printk("exec not implemented\n");
+    printk("-> name=%s, argc=%c, argv=%x\n", name, argc, argv);
+}
+#endif
+void do_exit(void) {
+    // TODO
+}
+int do_kill(pid_t pid) {
+    // TODO
+    printk("kill not implemented\n");
+    printk("-> pid=%d\n", pid);
+}
+int do_waitpid(pid_t pid) {
+    // TODO
+}
+void do_process_show(void) {
+    char *status_dict[] = {
+        "BLOCK  ",
+        "RUNNING",
+        "READY  ",
+        "EXITED "
+    };
+    printk("-------- PROCESS TABLE START --------\n");
+    printk("| idx | PID | name       | status  |\n");
+    for (int i=0; i<pcb_n; i++) {
+        char buf[11] = "          ";
+        strncpy(buf, pcb[i].name, strlen(pcb[i].name));
+        printk("| %03d | %03d | %s | %s |\n", i, pcb[i].pid, buf, status_dict[pcb[i].status]);
+    }
+    printk("--------- PROCESS TABLE END ---------\n");
+}
+pid_t do_getpid(void) {
+    // TODO
 }

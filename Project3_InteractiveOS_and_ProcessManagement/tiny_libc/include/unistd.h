@@ -9,32 +9,32 @@ void sys_yield(void);
 void sys_write(char *buff);
 void sys_move_cursor(int x, int y);
 void sys_reflush(void);
+void sys_clear(void);
 long sys_get_timebase(void);
 long sys_get_tick(void);
 int sys_mutex_init(int key);
 void sys_mutex_acquire(int mutex_idx);
 void sys_mutex_release(int mutex_idx);
-int sys_thread_create(uint64_t entrypoint, void *arg);
-void sys_thread_join(int tid, void **retval);
+pid_t sys_thread_create(uint64_t entrypoint, void *arg);
+void sys_thread_join(pid_t tid, void **retval);
 void sys_thread_exit(void *retval);
 
-/* TODO: [P3 task1] ps, getchar */
+/* ps, getchar */
 void sys_ps(void);
-int  sys_getchar(void);
+int sys_getchar(void);
 
-/* TODO: [P3 task1] exec, exit, kill waitpid */
+/* exec, exit, kill waitpid */
 // S-core
 pid_t  sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 // A/C-core
 // pid_t  sys_exec(char *name, int argc, char **argv);
 
 void sys_exit(void);
-int  sys_kill(pid_t pid);
-int  sys_waitpid(pid_t pid);
+int sys_kill(pid_t pid);
+int sys_waitpid(pid_t pid);
 pid_t sys_getpid();
 
-
-/* TODO: [P3 task2] barrier */ 
+/* TODO: [P3 task2] barrier */
 int  sys_barrier_init(int key, int goal);
 void sys_barrier_wait(int bar_idx);
 void sys_barrier_destroy(int bar_idx);
