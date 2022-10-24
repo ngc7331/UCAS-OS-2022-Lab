@@ -55,6 +55,9 @@ int main(void) {
     char buf[BUFSIZE];
     int hp = 0;
 
+    pid_t self = sys_getpid();
+    printf("Shell inited: pid=%d\n", self);
+
     while (1)
     {
         printf("> root@UCAS_OS: ");
@@ -72,14 +75,46 @@ int main(void) {
             sys_clear();
             init_shell();
         } else if (strncmp("exec", buf, 3) == 0) {
-            // TODO: implement exec
-            printf("exec not implemented\n");
+            char arg[BUFSIZE];
+            int i=4, j;
+            int id, argc;
+            uint64_t args[3];
+
+            lstrip(buf+i);
+            for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
+                arg[j] = buf[i+j];
+            id = atoi(arg);
+            i += j;
+
+            lstrip(buf+i);
+            for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
+                arg[j] = buf[i+j];
+            argc = atoi(arg);
+            i += j;
+
+            for (int k=0; k<3; k++) {
+                lstrip(buf+i);
+                for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
+                    arg[j] = buf[i+j];
+                args[k] = atoi(arg);
+                i += j;
+            }
+            sys_exec(id, argc, args[0], args[1], args[2]);
         } else if (strncmp("kill", buf, 3) == 0) {
             lstrip(buf+4);
             pid_t pid = atoi(buf+4);
+            if (pid == self) {
+                printf("Warning: you're trying to kill the shell\nConfirm (y/N)? ");
+                getline(buf, BUFSIZE);
+                lower(buf);
+                if (!(strcmp("y", buf)==0 || strcmp("yes", buf)==0)) {
+                    printf("Abort\n");
+                    continue;
+                }
+            }
             sys_kill(pid);
         } else {
-            printf("Command not found\n");
+            printf("Command %s not found\n", buf);
         }
     }
     return 0;
@@ -101,14 +136,13 @@ static char parsechar() {
         ch = '\b';
         break;
     case '\n': case '\r':  // new line
-        sys_write("\n");
+        printf("\n");
         ch = '\n';
         break;
     case '\033':           // control, dont echo
         break;
     default:               // echo
-        char buf[2] = {ch, "0"};
-        sys_write(buf);
+        printf("%c", ch);
     }
     return ch;
 }

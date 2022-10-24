@@ -149,6 +149,8 @@ void do_sleep(uint32_t);
 void do_block(pcb_t *, list_head *queue);
 void do_unblock(list_node_t *);
 
+#define S_CORE
+
 /* exec exit kill waitpid ps*/
 #ifdef S_CORE
 extern pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);

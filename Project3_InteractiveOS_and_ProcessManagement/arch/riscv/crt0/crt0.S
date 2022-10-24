@@ -23,13 +23,13 @@ clend:
     // enter main function
     call main
 
-    // TODO: replace this with new mechanism in p3-task2!
-    // finish task and return to the kernel
-    ld   ra, (sp)
-    addi sp, sp, 8
-    jr    ra
+    ; // finish task and return to the kernel
+    ; ld   ra, (sp)
+    ; addi sp, sp, 8
+    ; jr    ra
 
-    /* TODO: [P3] call sys_exit */
+    /* call sys_exit */
+    call sys_exit
 
 // while(1) loop, unreachable here
 loop:

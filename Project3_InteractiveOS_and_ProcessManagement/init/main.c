@@ -118,9 +118,12 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
     return pcb;
 }
 
-static void init_pcb(char *name) {
-    // load needed tasks and init their corresponding PCB
+#ifdef S_CORE
+void init_pcb(int id) {
+#else
+void init_pcb(char *name) {
     int id = get_taskid_by_name(name, APP);
+#endif
     pcb_t new;
     load_task_img(id, APP);
     new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
@@ -208,7 +211,11 @@ int main(void) {
     // Init Process Control Blocks |•'-'•) ✧
     init_pcb0();
     logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+#ifdef S_CORE
+    init_pcb(0);
+#else
     init_pcb("shell");
+#endif
     logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
     // Read CPU frequency (｡•ᴗ-)_

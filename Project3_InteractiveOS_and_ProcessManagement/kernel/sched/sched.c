@@ -56,6 +56,7 @@ void do_scheduler(void)
 
     // switch_to current_running
     switch_to(prev, current_running);
+    screen_move_cursor(current_running->cursor_x, current_running->cursor_y);
 }
 
 void do_sleep(uint32_t sleep_time)
@@ -89,26 +90,55 @@ void do_unblock(list_head *queue)
 }
 
 #ifdef S_CORE
+void init_pcb(int);
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
     // TODO
+    printk("exec not implemented\n");
+    printk("-> id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n", id, argc, arg0, arg1, arg2);
+    init_pcb(id);
+    return 0;
 }
 #else
+void init_pcb(char *name)
 pid_t do_exec(char *name, int argc, char *argv[]) {
     // TODO
     printk("exec not implemented\n");
-    printk("-> name=%s, argc=%c, argv=%x\n", name, argc, argv);
+    printk("-> name=%s, argc=%d, argv=%x\n", name, argc, argv);
+    return 0;
 }
 #endif
 void do_exit(void) {
-    // TODO
+    // kill process and its threads
+    for (int i=0; i<pcb_n; i++) {
+        if (pcb[i].pid == current_running->pid && pcb[i].status != TASK_EXITED) {
+            pcb[i].status = TASK_EXITED;
+        }
+    }
+    // FIXME: garbage collector?
+    // FIXME: wakeup waiting processes?
+    do_scheduler();
 }
 int do_kill(pid_t pid) {
-    // TODO
-    printk("kill not implemented\n");
-    printk("-> pid=%d\n", pid);
+    if (pid == 0) {
+        logging(LOG_CRITICAL, "scheduler", "trying to kill init, abort\n");
+        return -1;
+    } else if (pid == 1) {
+        logging(LOG_CRITICAL, "scheduler", "shell is killed\n");
+    }
+    int retval = 0;
+    for (int i=0; i<pcb_n; i++) {
+        if (pcb[i].pid == pid && pcb[i].status != TASK_EXITED) {
+            pcb[i].status = TASK_EXITED;
+            retval = 1;
+        }
+    }
+    // FIXME: garbage collector?
+    // FIXME: wakeup waiting processes?
+    return retval;
 }
 int do_waitpid(pid_t pid) {
     // TODO
+    return 0;
 }
 void do_process_show(void) {
     char *status_dict[] = {
@@ -127,5 +157,5 @@ void do_process_show(void) {
     printk("--------- PROCESS TABLE END ---------\n");
 }
 pid_t do_getpid(void) {
-    // TODO
+    return current_running->pid;
 }
