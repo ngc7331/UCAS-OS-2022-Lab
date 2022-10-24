@@ -41,5 +41,6 @@ void screen_write(char *buff);
 
 /* move cursor int (x,y) */
 void screen_move_cursor(int x, int y);
+void screen_move_cursor_r(int x, int y);
 
 #endif

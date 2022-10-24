@@ -85,6 +85,13 @@ void screen_move_cursor(int x, int y)
     vt100_move_cursor(x, y);
 }
 
+void screen_move_cursor_r(int x, int y)
+{
+    current_running->cursor_x += x;
+    current_running->cursor_y += y;
+    vt100_move_cursor(current_running->cursor_x, current_running->cursor_y);
+}
+
 void screen_write(char *buff)
 {
     int i = 0;

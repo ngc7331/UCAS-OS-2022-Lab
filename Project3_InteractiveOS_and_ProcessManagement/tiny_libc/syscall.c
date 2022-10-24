@@ -67,6 +67,11 @@ void sys_clear(void) {
     invoke_syscall(SYSCALL_CLEAR, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
+void sys_move_cursor_r(int x, int y) {
+    // move cursor using relative coordinates
+    invoke_syscall(SYSCALL_CURSOR_R, x, y, IGNORE, IGNORE, IGNORE);
+}
+
 int sys_mutex_init(int key)
 {
     /* call invoke_syscall to implement sys_mutex_init */
