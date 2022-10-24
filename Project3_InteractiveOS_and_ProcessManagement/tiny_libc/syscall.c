@@ -119,13 +119,13 @@ void sys_thread_exit(void *retval) {
 pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     /* call invoke_syscall to implement sys_exec for S_CORE */
-    return invoke_syscall(SYSCALL_EXEC, argc, arg0, arg1, arg2, IGNORE);
+    return invoke_syscall(SYSCALL_EXEC, id, argc, arg0, arg1, arg2);
 }
 // A/C-core
 // pid_t sys_exec(char *name, int argc, char **argv)
 // {
 //     /* call invoke_syscall to implement sys_exec */
-//     return invoke_syscall(SYSCALL_EXEC, argc, argv, IGNORE, IGNORE, IGNORE);
+//     return invoke_syscall(SYSCALL_EXEC, (long) name, argc, (long) argv, IGNORE, IGNORE);
 // }
 
 void sys_exit(void)
@@ -215,7 +215,7 @@ void sys_condition_destroy(int cond_idx)
 int sys_mbox_open(char * name)
 {
     /* call invoke_syscall to implement sys_mbox_open */
-    invoke_syscall(SYSCALL_MBOX_OPEN, (long) name, IGNORE, IGNORE, IGNORE, IGNORE);
+    return invoke_syscall(SYSCALL_MBOX_OPEN, (long) name, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
 void sys_mbox_close(int mbox_idx)

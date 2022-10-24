@@ -1,4 +1,5 @@
 #include <string.h>
+#include <ctype.h>
 
 void memcpy(uint8_t *dest, const uint8_t *src, uint32_t len)
 {
@@ -24,8 +25,8 @@ void bzero(void *dest, uint32_t len)
 int strlen(const char *src)
 {
     int i = 0;
-    while (src[i++] != '\0') {
-        ;
+    while (src[i] != '\0') {
+        i++;
     }
     return i;
 }
@@ -112,15 +113,11 @@ void strrev(char *str)
     }
 }
 
-static int is_space(char c) {
-    return c == ' ' || c == '\t';
-}
-
 // remove spaces from left end
 int lstrip(char *s) {
     char *tmp = s;
     int len = 0;
-    while (is_space(*s)) s++;
+    while (isspace(*s)) s++;
     for (; *s; len++, s++)
         tmp[len] = *s;
     tmp[len] = '\0';
@@ -132,7 +129,7 @@ int rstrip(char *s) {
     char *tmp = s;
     int len = -1;
     for (int i=0; *s; i++, s++)
-        if (!is_space(*s))
+        if (!isspace(*s))
             len = i;
     tmp[len+1] = '\0';
     return len+1;
@@ -142,4 +139,12 @@ int rstrip(char *s) {
 int strip(char *s) {
     lstrip(s);
     return rstrip(s);
+}
+
+void lower(char *s) {
+    while (*s) {
+        if (*s >= 'A' && *s <= 'Z')
+            *s += 32;
+        s ++;
+    }
 }

@@ -18,4 +18,6 @@ int lstrip(char *s);
 int rstrip(char *s);
 int strip(char *s);
 
+void lower(char *s);
+
 #endif
