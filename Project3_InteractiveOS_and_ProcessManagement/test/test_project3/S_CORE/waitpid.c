@@ -16,18 +16,18 @@ int main(int argc, int arg0)
     int handle1 = sys_mutex_init(LOCK1_KEY);
     int handle2 = sys_mutex_init(LOCK2_KEY);
 
-
     // Launch two assistant processes, and pass mutex handles to them
-    // TODO: [P3-TASK1 S-core] use your "ready_to_exit" id here
-    int rte_id = -1;
+    // use your "ready_to_exit" id here
+    // NOTE: this may change on different device
+    int rte_id = 2;
     assert(rte_id != -1);
     pid_t pid1 = sys_exec(rte_id, 3, print_location + 1, handle1, handle2);
 
     sys_sleep(1);  // wait enough time for task1 to acquire locks
-    
 
-    // TODO: [P3-TASK1 S-core] use your "wait_locks" id here
-    int wl_id = -1;
+    // use your "wait_locks" id here
+    // NOTE: this may change on different device
+    int wl_id = 4;
     assert(wl_id != -1);
     pid_t pid2 = sys_exec(wl_id, 3, print_location + 2, handle1, handle2);
 
