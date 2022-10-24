@@ -206,15 +206,7 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
 #endif
 
 void do_exit(void) {
-    logging(LOG_INFO, "exit", "pid=%d\n", pid);
-    // kill process and its threads
-    for (int i=0; i<pcb_n; i++) {
-        if (pcb[i].pid == current_running->pid && pcb[i].status != TASK_EXITED) {
-            pcb[i].status = TASK_EXITED;
-        }
-    }
-    // FIXME: garbage collector?
-    // FIXME: wakeup waiting processes?
+    do_kill(current_running->pid);
     do_scheduler();
 }
 
@@ -225,6 +217,7 @@ int do_kill(pid_t pid) {
     }
     logging(LOG_INFO, "scheduler", "%d.%s kill %d\n", current_running->pid, current_running->name, pid);
     int retval = 0;
+    // kill process and its threads
     for (int i=0; i<pcb_n; i++) {
         if (pcb[i].pid == pid && pcb[i].status != TASK_EXITED) {
             // kill shell -> restart shell
@@ -236,6 +229,7 @@ int do_kill(pid_t pid) {
             pcb[i].status = TASK_EXITED;
             list_delete(&pcb[i].list);
             retval = 1;
+            logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
         }
     }
     // FIXME: garbage collector?

@@ -37,15 +37,11 @@
 #define HISTSIZE 16
 
 static char getchar();
-static char parsechar();
 static int getline(char buf[], int bufsize);
-
-int lineno;
 
 static void init_shell() {
     sys_move_cursor(0, SHELL_BEGIN);
     printf("------------------- COMMAND -------------------\n");
-    lineno = SHELL_BEGIN;
 }
 
 int main(void) {
@@ -77,6 +73,7 @@ int main(void) {
         } else if (strncmp("exec", buf, 3) == 0) {
             char arg[BUFSIZE];
             int i = 4, argc;
+            int bg = buf[len-1] == '&';
             uint64_t args[4];
             for (argc=0; argc<4; argc++) {
                 int j;
@@ -88,7 +85,12 @@ int main(void) {
                 args[argc] = atoi(arg);
                 i += j;
             }
-            sys_exec(args[0], argc, args[1], args[2], args[3]);
+            pid_t pid = sys_exec(args[0], argc, args[1], args[2], args[3]);
+            if (bg) {
+                printf("Process created with pid=%d\n", pid);
+            } else {
+                sys_waitpid(pid);
+            }
         } else if (strncmp("kill", buf, 3) == 0) {
             lstrip(buf+4);
             pid_t pid = atoi(buf+4);
@@ -101,7 +103,20 @@ int main(void) {
                     continue;
                 }
             }
-            sys_kill(pid);
+            int retval = sys_kill(pid);
+            switch (retval) {
+            case -1:
+                printf("Critical error, abort\n");
+                break;
+            case 0:
+                printf("No process found with pid=%d\n", pid);
+                break;
+            case 1:
+                printf("Success\n");
+                break;
+            default:
+                printf("Internal Error\n");
+            }
         } else {
             printf("Command %s not found\n", buf);
         }
@@ -115,33 +130,35 @@ static char getchar() {
     return ch;
 }
 
-// parse special chars & echo on screen
-static char parsechar() {
-    char ch = getchar();
-    // echo
-    switch (ch) {
-    case '\b': case 127:   // backspace
-        // FIXME
-        ch = '\b';
-        break;
-    case '\n': case '\r':  // new line
-        printf("\n");
-        ch = '\n';
-        break;
-    case '\033':           // control, dont echo
-        break;
-    default:               // echo
-        printf("%c", ch);
-    }
-    return ch;
+static void putchar(char ch) {
+    char buf[2] = {ch, '\0'};
+    sys_write(buf);
+    sys_reflush();
+}
+
+static void backspace() {
+    sys_move_cursor_r(-1, 0);
+    sys_write(" ");
+    sys_move_cursor_r(-1, 0);
+    sys_reflush();
 }
 
 static int getline(char buf[], int bufsize) {
     int len = 0;
     char ch;
-    while ((ch=parsechar()) != '\n' && len < bufsize-1) {
-        buf[len++] = ch;
+    while ((ch=getchar()) != '\n' && ch != '\r' && len < bufsize-1) {
+        switch (ch) {
+        case '\b': case 127:
+            if (!len) break;
+            buf[--len] = '\0';
+            backspace();
+            break;
+        default:
+            buf[len++] = ch;
+            putchar(ch);
+        }
     }
+    putchar('\n');
     buf[len] = '\0';
     return len;
 }
