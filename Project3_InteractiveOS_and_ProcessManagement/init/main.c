@@ -21,12 +21,6 @@
 #define TASK_NUM_LOC 0x502001fa
 #define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
 
-extern void ret_from_exception();
-
-// last allocated pid
-int pid_n = 0;
-int pcb_n = 0;
-
 // tasks
 task_info_t apps[APP_MAXNUM];
 short appnum;
@@ -67,83 +61,6 @@ static void init_task_info(void) {
         else
             batchs[batchnum++] = *task++;
     }
-}
-
-static void init_pcb_stack(
-    ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
-    pcb_t *pcb) {
-     /* initialization of registers on kernel stack
-      * HINT: sp, ra, sepc, sstatus
-      * NOTE: To run the task in user mode, you should set corresponding bits
-      *     of sstatus(SPP, SPIE, etc.).
-      */
-    regs_context_t *pt_regs =
-        (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
-
-    for (int i=0; i<32; i++)
-        pt_regs->regs[i] = 0;
-    pt_regs->sbadaddr = 0;
-    pt_regs->scause = 0;
-    pt_regs->sstatus = SR_SPIE;
-
-    pt_regs->sepc = entry_point;
-    pt_regs->regs[2] = user_stack;
-    pt_regs->regs[4] = (reg_t) pcb;
-
-    // set sp to simulate just returning from switch_to
-    /* NOTE: you should prepare a stack, and push some values to
-     * simulate a callee-saved context.
-     */
-    switchto_context_t *pt_switchto =
-        (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
-
-    pcb->kernel_sp = (reg_t) pt_switchto;
-    pcb->user_sp = user_stack;
-
-    // save regs to kernel_stack
-    pt_switchto->regs[0] = (reg_t) ret_from_exception;
-    pt_switchto->regs[1] = user_stack;
-    for (int i=2; i<14; i++)
-        pt_switchto->regs[i] = 0;
-
-}
-
-void pcb_enqueue(list_node_t *queue, pcb_t *pcb) {
-    list_insert(queue->prev, &pcb->list);
-}
-
-pcb_t *pcb_dequeue(list_node_t *queue) {
-    pcb_t *pcb = list_entry(queue->next, pcb_t, list);
-    list_delete(queue->next);
-    return pcb;
-}
-
-#ifdef S_CORE
-void init_pcb(int id) {
-#else
-void init_pcb(char *name) {
-    int id = get_taskid_by_name(name, APP);
-#endif
-    pcb_t new;
-    load_task_img(id, APP);
-    new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
-    new.user_sp = allocUserPage(1) + PAGE_SIZE;
-    new.pid = ++pid_n;
-    new.tid = 0;
-    new.type = TYPE_PROCESS;
-    strcpy(new.name, apps[id].name);
-    new.cursor_x = new.cursor_y = 0;
-    new.status = TASK_READY;
-    new.retval = NULL;
-    new.joined = NULL;
-
-    logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
-    logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, new.kernel_sp, new.user_sp);
-
-    init_pcb_stack(new.kernel_sp, new.user_sp, apps[id].entrypoint, &new);
-
-    pcb[pcb_n] = new;
-    pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
 }
 
 static void init_pcb0(void) {
@@ -198,6 +115,14 @@ static void init_syscall(void) {
     syscall[SYSCALL_THREAD_EXIT]   = (long (*)()) thread_exit;
 }
 
+void init_shell(void) {
+#ifdef S_CORE
+    init_pcb(0, 0, 0, 0, 0);
+#else
+    init_pcb("shell", 0, 0);
+#endif
+}
+
 int main(void) {
     // Init jump table provided by BIOS (ΦωΦ)
     init_jmptab();
@@ -206,16 +131,12 @@ int main(void) {
     init_task_info();
 
     // set log level
-    set_loglevel(LOG_VERBOSE);
+    set_loglevel(LOG_DEBUG);
 
     // Init Process Control Blocks |•'-'•) ✧
     init_pcb0();
     logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
-#ifdef S_CORE
-    init_pcb(0);
-#else
-    init_pcb("shell");
-#endif
+    init_shell();
     logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
     // Read CPU frequency (｡•ᴗ-)_

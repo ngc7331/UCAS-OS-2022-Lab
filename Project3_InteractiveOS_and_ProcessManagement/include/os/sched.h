@@ -142,14 +142,20 @@ extern pcb_t pid0_pcb;
 extern const ptr_t pid0_stack;
 extern int pcb_n;
 
+#define S_CORE
+
+#ifdef S_CORE
+void init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+#else
+void init_pcb(char *name, int argc, char *argv[]);
+#endif
+
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
 void do_sleep(uint32_t);
 
 void do_block(pcb_t *, list_head *queue);
 void do_unblock(list_node_t *);
-
-#define S_CORE
 
 /* exec exit kill waitpid ps*/
 #ifdef S_CORE
