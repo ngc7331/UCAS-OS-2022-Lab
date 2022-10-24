@@ -76,30 +76,19 @@ int main(void) {
             init_shell();
         } else if (strncmp("exec", buf, 3) == 0) {
             char arg[BUFSIZE];
-            int i=4, j;
-            int id, argc;
-            uint64_t args[3];
-
-            lstrip(buf+i);
-            for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
-                arg[j] = buf[i+j];
-            id = atoi(arg);
-            i += j;
-
-            lstrip(buf+i);
-            for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
-                arg[j] = buf[i+j];
-            argc = atoi(arg);
-            i += j;
-
-            for (int k=0; k<3; k++) {
+            int i = 4, argc;
+            uint64_t args[4];
+            for (argc=0; argc<4; argc++) {
+                int j;
                 lstrip(buf+i);
                 for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
                     arg[j] = buf[i+j];
-                args[k] = atoi(arg);
+                if (!j)  // no arg
+                    break;
+                args[argc] = atoi(arg);
                 i += j;
             }
-            sys_exec(id, argc, args[0], args[1], args[2]);
+            sys_exec(args[0], argc, args[1], args[2], args[3]);
         } else if (strncmp("kill", buf, 3) == 0) {
             lstrip(buf+4);
             pid_t pid = atoi(buf+4);
