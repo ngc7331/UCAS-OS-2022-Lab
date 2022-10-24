@@ -23,10 +23,10 @@ clend:
     // enter main function
     call main
 
-    ; // finish task and return to the kernel
-    ; ld   ra, (sp)
-    ; addi sp, sp, 8
-    ; jr    ra
+    // finish task and return to the kernel
+    // ld   ra, (sp)
+    // addi sp, sp, 8
+    // jr    ra
 
     /* call sys_exit */
     call sys_exit
