@@ -20,8 +20,7 @@ int main(int argc, char * argv[])
     }
     assert(argc >= 2);
 
-    
-    struct TestMultiCoreArg *args = (struct TestMultiCoreArg *)(atoi(argv[1]));
+    struct TestMultiCoreArg *args = (struct TestMultiCoreArg *)(long)(atoi(argv[1]));
 
     int print_location = args->print_location;
     int from  = args->from;

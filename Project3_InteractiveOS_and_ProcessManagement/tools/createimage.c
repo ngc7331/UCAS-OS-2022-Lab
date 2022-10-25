@@ -54,7 +54,7 @@ static void read_ehdr(Elf64_Ehdr *ehdr, FILE *fp);
 static void read_phdr(Elf64_Phdr *phdr, FILE *fp, int ph, Elf64_Ehdr ehdr);
 static uint64_t get_entrypoint(Elf64_Ehdr ehdr);
 static uint32_t get_filesz(Elf64_Phdr phdr);
-static uint32_t get_memsz(Elf64_Phdr phdr);
+// static uint32_t get_memsz(Elf64_Phdr phdr);
 static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr);
 static void write_padding(FILE *img, int *phyaddr, int new_phyaddr);
 static void write_batch_file(FILE *img, FILE *batch);
@@ -234,9 +234,9 @@ static uint32_t get_filesz(Elf64_Phdr phdr) {
     return phdr.p_filesz;
 }
 
-static uint32_t get_memsz(Elf64_Phdr phdr) {
-    return phdr.p_memsz;
-}
+// static uint32_t get_memsz(Elf64_Phdr phdr) {
+//     return phdr.p_memsz;
+// }
 
 static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr) {
     if (phdr.p_memsz != 0 && phdr.p_type == PT_LOAD) {

@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
     int print_location = atoi(argv[1]);
     int handle_cond = atoi(argv[2]);
     int handle_lock = atoi(argv[3]);
-    int * num_staff = (int *)(atoi(argv[4])); 
+    int * num_staff = (int *)(long)(atoi(argv[4]));
 
     // Set random seed
     srand(clock());

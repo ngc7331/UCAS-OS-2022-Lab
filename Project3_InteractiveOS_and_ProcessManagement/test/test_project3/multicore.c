@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
     clock_t singleCoreBegin = clock();
 
     char singlecore_buf[BUF_LEN];
-    assert(itoa((int)singleCoreArg, singlecore_buf, BUF_LEN, 10) != -1);
+    assert(itoa((int)(long)singleCoreArg, singlecore_buf, BUF_LEN, 10) != -1);
     char *argv_singlecore[2] = {"add", singlecore_buf};
 
     pid_t single_pid = sys_exec(argv_singlecore[0], 2, argv_singlecore);
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     clock_t multiCoreBegin = clock();
     for (int i = 0; i < NUM_CPUS; ++i) {
         char multicore_buf[BUF_LEN];
-        assert(itoa((int)&multiCoreArgs[i], multicore_buf, BUF_LEN, 10) != -1);
+        assert(itoa((int)(long)&multiCoreArgs[i], multicore_buf, BUF_LEN, 10) != -1);
         char *argv_multicore[2] = {"add", multicore_buf};
         pids[i] = sys_exec(argv_multicore[0], 2, argv_multicore);
     }
