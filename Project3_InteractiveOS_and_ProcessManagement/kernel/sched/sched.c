@@ -66,8 +66,11 @@ static void init_pcb_stack(
     pt_regs->regs[4] = (reg_t) pcb;
     pt_regs->regs[10] = argc;
 #ifdef S_CORE
-
+    pt_regs->regs[11] = arg0;
+    pt_regs->regs[12] = arg1;
+    pt_regs->regs[13] = arg2;
 #else
+
 #endif
 
     // set sp to simulate just returning from switch_to
@@ -85,7 +88,6 @@ static void init_pcb_stack(
     pt_switchto->regs[1] = user_stack;
     for (int i=2; i<14; i++)
         pt_switchto->regs[i] = 0;
-
 }
 
 void pcb_enqueue(list_node_t *queue, pcb_t *pcb) {
@@ -99,28 +101,29 @@ pcb_t *pcb_dequeue(list_node_t *queue) {
 }
 
 #ifdef S_CORE
-void init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
 #else
-void init_pcb(char *name, int argc, char *argv[]) {
+pid_t init_pcb(char *name, int argc, char *argv[]) {
     int id = get_taskid_by_name(name, APP);
 #endif
-    pcb_t new;
+    if (id < 0 || id >= appnum)
+        return 0;
     load_task_img(id, APP);
-    new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
-    new.user_sp = allocUserPage(1) + PAGE_SIZE;
-    new.pid = ++pid_n;
-    new.tid = 0;
-    new.type = TYPE_PROCESS;
-    strcpy(new.name, apps[id].name);
-    new.cursor_x = new.cursor_y = 0;
-    new.status = TASK_READY;
-    new.retval = NULL;
-    new.joined = NULL;
+    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocKernelPage(1) + PAGE_SIZE;
+    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocUserPage(1) + PAGE_SIZE;
+    pcb[pcb_n].pid = ++pid_n;
+    pcb[pcb_n].tid = 0;
+    pcb[pcb_n].type = TYPE_PROCESS;
+    strcpy(pcb[pcb_n].name, apps[id].name);
+    pcb[pcb_n].cursor_x = pcb[pcb_n].cursor_y = 0;
+    pcb[pcb_n].status = TASK_READY;
+    pcb[pcb_n].retval = NULL;
+    pcb[pcb_n].joined = NULL;
 
-    logging(LOG_INFO, "init", "load %s as pid=%d\n", new.name, new.pid);
-    logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, new.kernel_sp, new.user_sp);
+    logging(LOG_INFO, "init", "load %s as pid=%d\n", pcb[pcb_n].name, pcb[pcb_n].pid);
+    logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp);
 
-    init_pcb_stack(new.kernel_sp, new.user_sp, apps[id].entrypoint, &new, argc,
+    init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
 #ifdef S_CORE
     arg0, arg1, arg2
 #else
@@ -128,8 +131,9 @@ void init_pcb(char *name, int argc, char *argv[]) {
 #endif
     );
 
-    pcb[pcb_n] = new;
-    pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
+    list_init(&pcb[pcb_n].wait_list);
+    pcb_enqueue(&ready_queue, &pcb[pcb_n]);
+    return pcb[pcb_n++].pid;
 }
 
 void do_scheduler(void)
@@ -165,14 +169,11 @@ void do_sleep(uint32_t sleep_time)
 {
     // sleep(seconds)
     // NOTE: you can assume: 1 second = 1 `timebase` ticks
-    // 1. block the current_running
-    current_running->status = TASK_BLOCKED;
-    pcb_enqueue(&sleep_queue, current_running);
-    // 2. set the wake up time for the blocked task
+    // set the wake up time for the blocked task
     current_running->wakeup_time = get_ticks() + sleep_time * time_base;
-    // 3. reschedule because the current_running is blocked.
     logging(LOG_INFO, "timer", "block %d.%s until %d\n", current_running->pid, current_running->name, current_running->wakeup_time);
-    do_scheduler();
+    // call do_block
+    do_block(current_running, &sleep_queue);
 }
 
 void do_block(pcb_t *pcb, list_head *queue)
@@ -194,14 +195,12 @@ void do_unblock(list_head *queue)
 #ifdef S_CORE
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
     logging(LOG_INFO, "exec", "id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n", id, argc, arg0, arg1, arg2);
-    init_pcb(id, argc, arg0, arg1, arg2);
-    return pcb_n - 1;
+    return init_pcb(id, argc, arg0, arg1, arg2);
 }
 #else
 pid_t do_exec(char *name, int argc, char *argv[]) {
     logging(LOG_INFO, "exec", "name=%s, argc=%d, argv=%x\n", name, argc, argv);
-    init_pcb(name, argc, argv);
-    return pcb_n - 1;
+    return init_pcb(name, argc, argv);
 }
 #endif
 
@@ -226,20 +225,33 @@ int do_kill(pid_t pid) {
                     init_shell();
                     logging(LOG_WARNING, "scheduler", "shell is killed and restarted\n");
             }
+            // wakeup waiting processes
+            while (!list_is_empty(&pcb[i].wait_list)) {
+                do_unblock(&pcb[i].wait_list);
+                logging(LOG_INFO, "scheduler", "wakeup waiting process\n");
+            }
+            // FIXME: collect unreleased locks?
+            // do kill
             pcb[i].status = TASK_EXITED;
             list_delete(&pcb[i].list);
-            retval = 1;
             logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
+            retval = 1;
         }
     }
     // FIXME: garbage collector?
-    // FIXME: wakeup waiting processes?
     return retval;
 }
 
 int do_waitpid(pid_t pid) {
-    // TODO
-    return 0;
+    int retval = 0;
+    logging(LOG_INFO, "scheduler", "%d.%s wait %d\n", current_running->pid, current_running->name, pid);
+    for (int i=0; i<pcb_n; i++) {
+        if (pcb[i].pid == pid && pcb[i].type == TYPE_PROCESS) {
+            do_block(current_running, &pcb[i].wait_list);
+            retval = pid;
+        }
+    }
+    return retval;
 }
 
 void do_process_show(void) {
@@ -249,14 +261,15 @@ void do_process_show(void) {
         "READY  ",
         "EXITED "
     };
-    printk("-------- PROCESS TABLE START --------\n");
-    printk("| idx | PID | name       | status  |\n");
+    printk("----------- PROCESS TABLE START -----------\n");
+    printk("| idx | PID | name             | status  |\n");
     for (int i=0; i<pcb_n; i++) {
-        char buf[11] = "          ";
-        strncpy(buf, pcb[i].name, strlen(pcb[i].name));
+        char buf[17] = "                ";
+        int len = strlen(pcb[i].name);
+        strncpy(buf, pcb[i].name, len<16 ? len : 16);
         printk("| %03d | %03d | %s | %s |\n", i, pcb[i].pid, buf, status_dict[pcb[i].status]);
     }
-    printk("--------- PROCESS TABLE END ---------\n");
+    printk("------------ PROCESS TABLE END ------------\n");
 }
 
 pid_t do_getpid(void) {

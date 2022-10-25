@@ -90,6 +90,8 @@ typedef struct pcb
 
     /* previous, next pointer */
     list_node_t list;
+
+    /* wait list */
     list_head wait_list;
 
     /* process id & thread id
@@ -145,9 +147,9 @@ extern int pcb_n;
 #define S_CORE
 
 #ifdef S_CORE
-void init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else
-void init_pcb(char *name, int argc, char *argv[]);
+pid_t init_pcb(char *name, int argc, char *argv[]);
 #endif
 
 extern void switch_to(pcb_t *prev, pcb_t *next);
