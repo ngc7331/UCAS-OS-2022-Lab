@@ -48,6 +48,7 @@ typedef struct mutex_lock
     list_head block_queue;
     int key;
     int allocated;
+    pid_t pid;
 } mutex_lock_t;
 
 void init_locks(void);
@@ -60,6 +61,7 @@ void spin_lock_release(spin_lock_t *lock);
 int do_mutex_lock_init(int key);
 void do_mutex_lock_acquire(int mlock_idx);
 void do_mutex_lock_release(int mlock_idx);
+void do_mutex_lock_release_f(pid_t pid);
 
 typedef struct barrier
 {

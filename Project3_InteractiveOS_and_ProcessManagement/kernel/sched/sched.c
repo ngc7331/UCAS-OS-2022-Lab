@@ -180,7 +180,7 @@ void do_sleep(uint32_t sleep_time)
     // NOTE: you can assume: 1 second = 1 `timebase` ticks
     // set the wake up time for the blocked task
     current_running->wakeup_time = get_ticks() + sleep_time * time_base;
-    logging(LOG_INFO, "timer", "block %d.%s until %d\n", current_running->pid, current_running->name, current_running->wakeup_time);
+    logging(LOG_INFO, "timer", "set wakeup time %d for %d.%s.%d\n", current_running->wakeup_time, current_running->pid, current_running->name, current_running->tid);
     // call do_block
     do_block(current_running, &sleep_queue);
 }
@@ -188,6 +188,7 @@ void do_sleep(uint32_t sleep_time)
 void do_block(pcb_t *pcb, list_head *queue)
 {
     // block the pcb task into the block queue
+    logging(LOG_INFO, "scheduler", "block %d.%s.%d\n", pcb->pid, pcb->name, pcb->tid);
     pcb_enqueue(queue, pcb);
     pcb->status = TASK_BLOCKED;
     do_scheduler();
@@ -197,6 +198,7 @@ void do_unblock(list_head *queue)
 {
     // unblock the `pcb` from the block queue
     pcb_t *pcb = pcb_dequeue(queue);
+    logging(LOG_INFO, "scheduler", "unblock %d.%s.%d\n", pcb->pid, pcb->name, pcb->tid);
     pcb->status = TASK_READY;
     pcb_enqueue(&ready_queue, pcb);
 }
@@ -231,14 +233,16 @@ int do_kill(pid_t pid) {
             // wakeup waiting processes
             while (!list_is_empty(&pcb[i].wait_list)) {
                 do_unblock(&pcb[i].wait_list);
-                logging(LOG_INFO, "scheduler", "wakeup waiting process\n");
             }
             // FIXME: collect unreleased locks?
+            do_mutex_lock_release_f(pcb[i].pid);
             // do kill
             pcb[i].status = TASK_EXITED;
+            // remove pcb from any queue, this will do nothing if pcb is not in a queue
             list_delete(&pcb[i].list);
-            logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
+            // return success
             retval = 1;
+            logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
             // shell is killed, warn and restart
             if (strcmp("shell", pcb[i].name) == 0) {
                 init_shell();

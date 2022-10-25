@@ -40,7 +40,7 @@ void check_sleeping(void)
     for (list_node_t *p=sleep_queue.next; p!=&sleep_queue; ) {
         pcb_t *pcb = list_entry(p, pcb_t, list);
         if (pcb->wakeup_time <= get_ticks()) {
-            logging(LOG_INFO, "timer", "unblock %d.%s, expected at %d\n", pcb->pid, pcb->name, pcb->wakeup_time);
+            logging(LOG_INFO, "timer", "wakeup %d.%s.%d, expected at %d\n", pcb->pid, pcb->name, pcb->tid, pcb->wakeup_time);
             p = list_delete(p);
             pcb->status = TASK_READY;
             pcb_enqueue(&ready_queue, pcb);
