@@ -76,6 +76,8 @@ int main(void) {
         // call syscall to read UART port & parse input
         int len = getline(buf, BUFSIZE);
         len = strip(buf);
+        // just continue if nothing is inputed
+        if (!len) continue;
         // record history for up/down
         strncpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf, len);
 
@@ -101,10 +103,12 @@ int main(void) {
                 args[argc] = atoi(arg);
                 pbuf += i;
             }
+            // no arg
             if (argc == 0) {
                 printf("Error: taskid can't be empty\nUsage: exec id [arg0] ... [arg3]\n");
                 continue;
             }
+            // exec
             pid_t pid = sys_exec(args[0], argc-1, args[1], args[2], args[3]);
 #else
             char *argv[BUFSIZE / 2];
@@ -116,10 +120,14 @@ int main(void) {
                 // pbuf -> next ch of the end of an arg, should be space or '\0'
                 if (*pbuf) *pbuf++ = '\0';
             }
+            // remove last '&' from args
+            argc -= bg;
+            // no arg
             if (argc == 0) {
                 printf("Error: name can't be empty\nUsage: exec name [arg0] ...\n");
                 continue;
             }
+            // exec
             pid_t pid = sys_exec(argv[0], argc, argv);
 #endif
             if (!pid) {
@@ -132,10 +140,13 @@ int main(void) {
                 printf("Done\n");
             }
         } else if (iscmd("kill", buf)) {
-            lstrip(buf+4);
+            if (!lstrip(buf+4)) {
+                printf("Error: pid can't be empty\nUsage: kill pid\n");
+                continue;
+            }
             pid_t pid = atoi(buf+4);
             if (pid == 0) {
-                printf("Error: pid can't be empty\nUsage: kill pid\n");
+                printf("Error: pid can't be 0\n");
                 continue;
             } else if (pid == self) {
                 printf("Warning: you're trying to kill the shell\nConfirm (y/N)? ");

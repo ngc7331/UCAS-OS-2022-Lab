@@ -68,6 +68,7 @@ static void init_pcb_stack(
     pt_regs->regs[11] = arg0;
     pt_regs->regs[12] = arg1;
     pt_regs->regs[13] = arg2;
+    logging(LOG_DEBUG, "init", "...arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
 #else
     char **pt_argv = (char **) (user_stack - (argc + 1) * 8);
     user_sp = (char *) pt_argv;
@@ -75,6 +76,7 @@ static void init_pcb_stack(
         user_sp -= strlen(argv[i]) + 1;
         strcpy(user_sp, argv[i]);
         pt_argv[i] = user_sp;
+        logging(LOG_DEBUG, "init", "...argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
     }
     pt_argv[argc] = NULL;
     pt_regs->regs[11] = (reg_t) pt_argv;
@@ -91,6 +93,7 @@ static void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = (reg_t) user_sp;
+    logging(LOG_DEBUG, "init", "...kernel_sp=%x, user_sp=%x\n", pcb->kernel_sp, pcb->user_sp);
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -130,7 +133,7 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     pcb[pcb_n].joined = NULL;
 
     logging(LOG_INFO, "init", "load %s as pid=%d\n", pcb[pcb_n].name, pcb[pcb_n].pid);
-    logging(LOG_VERBOSE, "init", "...entrypoint=%x kernel_sp=%x user_sp=%x\n", apps[id].entrypoint, pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp);
+    logging(LOG_DEBUG, "init", "...entrypoint=%x\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
 #ifdef S_CORE
@@ -205,12 +208,12 @@ void do_unblock(list_head *queue)
 
 #ifdef S_CORE
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
-    logging(LOG_INFO, "exec", "id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n", id, argc, arg0, arg1, arg2);
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n", current_running->pid, current_running->name, current_running->tid, id, argc, arg0, arg1, arg2);
     return init_pcb(id, argc, arg0, arg1, arg2);
 }
 #else
 pid_t do_exec(char *name, int argc, char *argv[]) {
-    logging(LOG_INFO, "exec", "name=%s, argc=%d, argv=%x\n", name, argc, argv);
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n", current_running->pid, current_running->name, current_running->tid, name, argc, argv);
     return init_pcb(name, argc, argv);
 }
 #endif
