@@ -55,22 +55,31 @@ static void init_pcb_stack(
     regs_context_t *pt_regs =
         (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
 
+    char *user_sp = (char *) user_stack;
+
     for (int i=0; i<32; i++)
         pt_regs->regs[i] = 0;
     pt_regs->sbadaddr = 0;
     pt_regs->scause = 0;
     pt_regs->sstatus = SR_SPIE;
-
     pt_regs->sepc = entry_point;
-    pt_regs->regs[2] = user_stack;
-    pt_regs->regs[4] = (reg_t) pcb;
     pt_regs->regs[10] = argc;
 #ifdef S_CORE
     pt_regs->regs[11] = arg0;
     pt_regs->regs[12] = arg1;
     pt_regs->regs[13] = arg2;
 #else
-
+    char **pt_argv = (char **) (user_stack - (argc + 1) * 8);
+    user_sp = (char *) pt_argv;
+    for (int i=0; i<argc; i++) {
+        user_sp -= strlen(argv[i]) + 1;
+        strcpy(user_sp, argv[i]);
+        pt_argv[i] = user_sp;
+    }
+    pt_argv[argc] = NULL;
+    pt_regs->regs[11] = (reg_t) pt_argv;
+    // alignment
+    user_sp = (char *) ROUNDDOWN(user_sp, 128);
 #endif
 
     // set sp to simulate just returning from switch_to
@@ -81,7 +90,7 @@ static void init_pcb_stack(
         (switchto_context_t *)((ptr_t)pt_regs - sizeof(switchto_context_t));
 
     pcb->kernel_sp = (reg_t) pt_switchto;
-    pcb->user_sp = user_stack;
+    pcb->user_sp = (reg_t) user_sp;
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -219,12 +228,6 @@ int do_kill(pid_t pid) {
     // kill process and its threads
     for (int i=0; i<pcb_n; i++) {
         if (pcb[i].pid == pid && pcb[i].status != TASK_EXITED) {
-            // kill shell -> restart shell
-            if (strcmp("shell", pcb[i].name) == 0) {
-                // shell is killed, warn and restart
-                    init_shell();
-                    logging(LOG_WARNING, "scheduler", "shell is killed and restarted\n");
-            }
             // wakeup waiting processes
             while (!list_is_empty(&pcb[i].wait_list)) {
                 do_unblock(&pcb[i].wait_list);
@@ -236,6 +239,11 @@ int do_kill(pid_t pid) {
             list_delete(&pcb[i].list);
             logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
             retval = 1;
+            // shell is killed, warn and restart
+            if (strcmp("shell", pcb[i].name) == 0) {
+                init_shell();
+                logging(LOG_WARNING, "scheduler", "shell is killed and restarted\n");
+            }
         }
     }
     // FIXME: garbage collector?
@@ -247,7 +255,8 @@ int do_waitpid(pid_t pid) {
     logging(LOG_INFO, "scheduler", "%d.%s wait %d\n", current_running->pid, current_running->name, pid);
     for (int i=0; i<pcb_n; i++) {
         if (pcb[i].pid == pid && pcb[i].type == TYPE_PROCESS) {
-            do_block(current_running, &pcb[i].wait_list);
+            if (pcb[i].status != TASK_EXITED)
+                do_block(current_running, &pcb[i].wait_list);
             retval = pid;
         }
     }

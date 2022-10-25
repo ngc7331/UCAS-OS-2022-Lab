@@ -24,7 +24,7 @@ void sys_thread_exit(void *retval);
 void sys_ps(void);
 int sys_getchar(void);
 
-#define S_CORE
+// #define S_CORE
 
 /* exec, exit, kill waitpid */
 #ifdef S_CORE

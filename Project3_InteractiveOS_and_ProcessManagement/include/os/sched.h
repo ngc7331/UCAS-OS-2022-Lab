@@ -144,7 +144,7 @@ extern pcb_t pid0_pcb;
 extern const ptr_t pid0_stack;
 extern int pcb_n;
 
-#define S_CORE
+// #define S_CORE
 
 #ifdef S_CORE
 pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);

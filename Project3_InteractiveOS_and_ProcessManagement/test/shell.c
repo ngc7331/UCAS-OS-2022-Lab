@@ -36,6 +36,8 @@
 #define BUFSIZE 64
 #define HISTSIZE 16
 
+// #define S_CORE
+
 static char getchar();
 static int getline(char buf[], int bufsize);
 int round_add(int *a, int b, int lim, int orig) {
@@ -83,26 +85,43 @@ int main(void) {
             sys_clear();
             init_shell();
         } else if (iscmd("exec", buf)) {
+            int argc = 0, bg = buf[len-1] == '&' && isspace(buf[len-2]);
+            char *pbuf = buf + 5;
+#ifdef S_CORE
             char arg[BUFSIZE];
-            int i = 4, argc;
-            int bg = buf[len-1] == '&';
             uint64_t args[4];
-            for (argc=0; argc<4; argc++) {
-                int j;
-                lstrip(buf+i);
-                for (j=0; buf[i+j] != '\0' && !isspace(buf[i+j]); j++)
-                    arg[j] = buf[i+j];
-                if (!j)  // no arg
+            for (; argc<4; argc++) {
+                while (isspace(*pbuf)) pbuf++;
+                int i;
+                for (i=0; pbuf[i] != '\0' && !isspace(pbuf[i]); i++)
+                    arg[i] = pbuf[i];
+                if (!i)  // no arg
                     break;
-                arg[j+1] = '\0';
+                arg[i] = '\0';
                 args[argc] = atoi(arg);
-                i += j;
+                pbuf += i;
             }
-            pid_t pid = sys_exec(args[0], argc, args[1], args[2], args[3]);
-            if (bg) {
+            pid_t pid = sys_exec(args[0], argc-1, args[1], args[2], args[3]);
+#else
+            char *argv[BUFSIZE / 2];
+            while (*pbuf) {
+                while (isspace(*pbuf)) pbuf++;
+                // pbuf -> start of an arg
+                argv[argc++] = pbuf;
+                while (!isspace(*pbuf) && *pbuf) pbuf++;
+                // pbuf -> next ch of the end of an arg, should be space or '\0'
+                if (*pbuf) *pbuf++ = '\0';
+            }
+            pid_t pid = sys_exec(argv[0], argc, argv);
+#endif
+            if (!pid) {
+                printf("Execute failed\n");
+            } else if (bg) {
                 printf("Process created with pid=%d\n", pid);
             } else {
+                printf("Process created with pid=%d, waiting... ", pid);
                 sys_waitpid(pid);
+                printf("Done\n");
             }
         } else if (iscmd("kill", buf)) {
             lstrip(buf+4);

@@ -120,7 +120,7 @@ void init_shell(void) {
 #ifdef S_CORE
     init_pcb(0, 0, 0, 0, 0);
 #else
-    init_pcb("shell", 0, 0);
+    init_pcb("shell", 0, NULL);
 #endif
 }
 
