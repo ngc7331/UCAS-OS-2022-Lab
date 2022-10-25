@@ -8,7 +8,7 @@ int main(int argc, int arg0, int arg1, int arg2)
     assert(argc >= 3);
     int print_location = arg0;
     int handle1 = arg1;
-    int handle2 = arg2;    
+    int handle2 = arg2;
 
     // Acquire two mutex locks
     sys_mutex_acquire(handle1);
