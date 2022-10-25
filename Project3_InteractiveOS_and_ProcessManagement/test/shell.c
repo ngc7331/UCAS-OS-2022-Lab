@@ -38,18 +38,31 @@
 
 static char getchar();
 static int getline(char buf[], int bufsize);
+int round_add(int *a, int b, int lim, int orig) {
+    int tmp = *a;
+    *a += b;
+    while (*a >= lim) *a -= lim;
+    while (*a < 0) *a += lim;
+    return orig ? tmp : *a;
+}
+
+char history[HISTSIZE][BUFSIZE];
+int hp = 0;
 
 static void init_shell() {
     sys_move_cursor(0, SHELL_BEGIN);
     printf("------------------- COMMAND -------------------\n");
 }
 
+static int iscmd(const char *cmd, char *buf) {
+    int len = strlen(cmd);
+    return strncmp(buf, cmd, len-1) == 0 && (isspace(buf[len]) || buf[len] == '\0');
+}
+
 int main(void) {
     init_shell();
 
-    char history[HISTSIZE][BUFSIZE];
     char buf[BUFSIZE];
-    int hp = 0;
 
     pid_t self = sys_getpid();
     printf("Shell inited: pid=%d\n", self);
@@ -61,16 +74,15 @@ int main(void) {
         int len = getline(buf, BUFSIZE);
         len = strip(buf);
         // record history for later use
-        strncpy(history[hp++], buf, len);
-        if (hp == HISTSIZE) hp = 0;
+        strncpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf, len);
 
         // ps, exec, kill, clear
-        if (strncmp("ps", buf, 1) == 0) {
+        if (iscmd("ps", buf)) {
             sys_ps();
-        } else if (strncmp("clear", buf, 4) == 0) {
+        } else if (iscmd("clear", buf)) {
             sys_clear();
             init_shell();
-        } else if (strncmp("exec", buf, 3) == 0) {
+        } else if (iscmd("exec", buf)) {
             char arg[BUFSIZE];
             int i = 4, argc;
             int bg = buf[len-1] == '&';
@@ -82,6 +94,7 @@ int main(void) {
                     arg[j] = buf[i+j];
                 if (!j)  // no arg
                     break;
+                arg[j+1] = '\0';
                 args[argc] = atoi(arg);
                 i += j;
             }
@@ -91,7 +104,7 @@ int main(void) {
             } else {
                 sys_waitpid(pid);
             }
-        } else if (strncmp("kill", buf, 3) == 0) {
+        } else if (iscmd("kill", buf)) {
             lstrip(buf+4);
             pid_t pid = atoi(buf+4);
             if (pid == self) {
@@ -143,7 +156,17 @@ static void backspace() {
     sys_reflush();
 }
 
+static void clearline(int len) {
+    char blank[] = "                                ";
+    int blank_size = 32;
+    sys_move_cursor_r(-len, 0);
+    sys_write(blank);
+    sys_move_cursor_r(-blank_size, 0);
+    sys_reflush();
+}
+
 static int getline(char buf[], int bufsize) {
+    int tmphp = hp;
     int len = 0;
     char ch;
     while ((ch=getchar()) != '\n' && ch != '\r' && len < bufsize-1) {
@@ -152,6 +175,26 @@ static int getline(char buf[], int bufsize) {
             if (!len) break;
             buf[--len] = '\0';
             backspace();
+            break;
+        case '\033':
+            /* handle control:
+             * up:    \033[A
+             * down:  \033[B
+             * right: \033\000[C\000
+             * left:  \033\000[D\000
+             */
+            if (getchar() == '\000')  // align to '['
+                getchar();
+            if ((ch=getchar()) == 'A' || ch == 'B') {
+                strcpy(buf, history[round_add(&tmphp, ch=='A' ? -1 : 1, HISTSIZE, 0)]);
+                clearline(len);
+                sys_write(buf);
+                sys_reflush();
+                len = strlen(buf);
+            } else { // 'C' || 'D'
+                // FIXME: do nothing now
+                getchar(); // remove '\000'
+            }
             break;
         default:
             buf[len++] = ch;
