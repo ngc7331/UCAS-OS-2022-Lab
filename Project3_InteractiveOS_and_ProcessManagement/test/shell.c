@@ -52,6 +52,7 @@ char history[HISTSIZE][BUFSIZE];
 int hp = 0;
 
 static void init_shell() {
+    sys_clear();
     sys_move_cursor(0, SHELL_BEGIN);
     printf("------------------- COMMAND -------------------\n");
 }
@@ -75,14 +76,13 @@ int main(void) {
         // call syscall to read UART port & parse input
         int len = getline(buf, BUFSIZE);
         len = strip(buf);
-        // record history for later use
+        // record history for up/down
         strncpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf, len);
 
-        // ps, exec, kill, clear
+        // commands
         if (iscmd("ps", buf)) {
             sys_ps();
         } else if (iscmd("clear", buf)) {
-            sys_clear();
             init_shell();
         } else if (iscmd("exec", buf)) {
             int argc = 0, bg = buf[len-1] == '&' && isspace(buf[len-2]);
@@ -101,6 +101,10 @@ int main(void) {
                 args[argc] = atoi(arg);
                 pbuf += i;
             }
+            if (argc == 0) {
+                printf("Error: taskid can't be empty\nUsage: exec id [arg0] ... [arg3]\n");
+                continue;
+            }
             pid_t pid = sys_exec(args[0], argc-1, args[1], args[2], args[3]);
 #else
             char *argv[BUFSIZE / 2];
@@ -111,6 +115,10 @@ int main(void) {
                 while (!isspace(*pbuf) && *pbuf) pbuf++;
                 // pbuf -> next ch of the end of an arg, should be space or '\0'
                 if (*pbuf) *pbuf++ = '\0';
+            }
+            if (argc == 0) {
+                printf("Error: name can't be empty\nUsage: exec name [arg0] ...\n");
+                continue;
             }
             pid_t pid = sys_exec(argv[0], argc, argv);
 #endif
@@ -126,7 +134,10 @@ int main(void) {
         } else if (iscmd("kill", buf)) {
             lstrip(buf+4);
             pid_t pid = atoi(buf+4);
-            if (pid == self) {
+            if (pid == 0) {
+                printf("Error: pid can't be empty\nUsage: kill pid\n");
+                continue;
+            } else if (pid == self) {
                 printf("Warning: you're trying to kill the shell\nConfirm (y/N)? ");
                 getline(buf, BUFSIZE);
                 lower(buf);
@@ -149,6 +160,13 @@ int main(void) {
             default:
                 printf("Internal Error\n");
             }
+        } else if (iscmd("help", buf)) {
+            printf("--- HELP START ---\n");
+            printf("\tps\n");
+            printf("\tclear\n");
+            printf("\texec name [arg0] ...\n");
+            printf("\tkill pid\n");
+            printf("---- HELP END ----\n");
         } else {
             printf("Command %s not found\n", buf);
         }
