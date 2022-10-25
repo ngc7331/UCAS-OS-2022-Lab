@@ -120,18 +120,21 @@ void sys_thread_exit(void *retval) {
     invoke_syscall(SYSCALL_THREAD_EXIT, (long) retval, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
+#ifdef S_CORE
 // S-core
 pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
     /* call invoke_syscall to implement sys_exec for S_CORE */
     return invoke_syscall(SYSCALL_EXEC, id, argc, arg0, arg1, arg2);
 }
+#else
 // A/C-core
-// pid_t sys_exec(char *name, int argc, char **argv)
-// {
-//     /* call invoke_syscall to implement sys_exec */
-//     return invoke_syscall(SYSCALL_EXEC, (long) name, argc, (long) argv, IGNORE, IGNORE);
-// }
+pid_t sys_exec(char *name, int argc, char **argv)
+{
+    /* call invoke_syscall to implement sys_exec */
+    return invoke_syscall(SYSCALL_EXEC, (long) name, argc, (long) argv, IGNORE, IGNORE);
+}
+#endif
 
 void sys_exit(void)
 {

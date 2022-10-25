@@ -24,11 +24,16 @@ void sys_thread_exit(void *retval);
 void sys_ps(void);
 int sys_getchar(void);
 
+#define S_CORE
+
 /* exec, exit, kill waitpid */
+#ifdef S_CORE
 // S-core
-pid_t  sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+#else
 // A/C-core
-// pid_t  sys_exec(char *name, int argc, char **argv);
+pid_t sys_exec(char *name, int argc, char **argv);
+#endif
 
 void sys_exit(void);
 int sys_kill(pid_t pid);
@@ -40,14 +45,14 @@ int  sys_barrier_init(int key, int goal);
 void sys_barrier_wait(int bar_idx);
 void sys_barrier_destroy(int bar_idx);
 
-/* TODO: [P3 task2] condition */ 
+/* TODO: [P3 task2] condition */
 int sys_condition_init(int key);
 void sys_condition_wait(int cond_idx, int mutex_idx);
 void sys_condition_signal(int cond_idx);
 void sys_condition_broadcast(int cond_idx);
 void sys_condition_destroy(int cond_idx);
 
-/* TODO: [P3 task2] mailbox */ 
+/* TODO: [P3 task2] mailbox */
 int sys_mbox_open(char * name);
 void sys_mbox_close(int mbox_id);
 int sys_mbox_send(int mbox_idx, void *msg, int msg_length);
