@@ -87,9 +87,13 @@ void screen_move_cursor(int x, int y)
 
 void screen_move_cursor_r(int x, int y)
 {
-    current_running->cursor_x += x;
-    current_running->cursor_y += y;
-    vt100_move_cursor(current_running->cursor_x, current_running->cursor_y);
+    int nx = current_running->cursor_x + x;
+    int ny = current_running->cursor_y + y;
+    if (nx < 0) nx = 0;
+    if (nx > SCREEN_WIDTH) nx = SCREEN_WIDTH;
+    if (ny < 0) ny = 0;
+    if (ny > SCREEN_HEIGHT) ny = SCREEN_HEIGHT;
+    screen_move_cursor(nx, ny);
 }
 
 void screen_write(char *buff)
