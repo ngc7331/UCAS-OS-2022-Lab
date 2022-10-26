@@ -36,7 +36,7 @@ typedef struct {
     int execute_on_load;
 } task_info_t;
 
-#define APP_MAXNUM 16
+#define APP_MAXNUM 64
 #define BATCH_MAXNUM 16
 #define TASK_MAXNUM (APP_MAXNUM + BATCH_MAXNUM)
 static task_info_t taskinfo[TASK_MAXNUM];
