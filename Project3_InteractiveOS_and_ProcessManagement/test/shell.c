@@ -36,8 +36,6 @@
 #define BUFSIZE 64
 #define HISTSIZE 16
 
-// #define S_CORE
-
 static char getchar();
 static int getline(char buf[], int bufsize);
 int round_add(int *a, int b, int lim, int orig) {
@@ -57,9 +55,19 @@ static void init_shell() {
     printf("------------------- COMMAND -------------------\n");
 }
 
-static int iscmd(const char *cmd, char *buf) {
-    int len = strlen(cmd);
-    return strncmp(buf, cmd, len-1) == 0 && (isspace(buf[len]) || buf[len] == '\0');
+static int confirm(char msg[], int d) {
+    char buf[BUFSIZE];
+    printf("%sConfirm (%s)? ", msg, d?"Y/n":"y/N");
+    getline(buf, BUFSIZE);
+    strip(buf);
+    lower(buf);
+    if ((!d && !(strcmp("y", buf)==0 || strcmp("yes", buf)==0)) ||
+        ( d && !(strcmp("n", buf)==0 || strcmp("no",  buf)==0))
+    ) {
+        printf("Abort\n");
+        return 0;
+    }
+    return 1;
 }
 
 int main(void) {
@@ -81,54 +89,44 @@ int main(void) {
         // record history for up/down
         strncpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf, len);
 
+        // argparser
+        int argc = 0;
+        char *argv[BUFSIZE / 2];
+        char *pbuf = buf;
+        while (*pbuf) {
+            while (isspace(*pbuf)) pbuf++;
+            // pbuf -> start of an arg
+            argv[argc++] = pbuf;
+            while (!isspace(*pbuf) && *pbuf) pbuf++;
+            // pbuf -> next ch of the end of an arg, should be space or '\0'
+            if (*pbuf) *pbuf++ = '\0';
+        }
+
         // commands
-        if (iscmd("ps", buf)) {
+        if (strcmp("ps", argv[0]) == 0) {
             sys_ps();
-        } else if (iscmd("clear", buf)) {
+        } else if (strcmp("clear", argv[0]) == 0) {
             init_shell();
-        } else if (iscmd("exec", buf)) {
-            int argc = 0, bg = buf[len-1] == '&' && isspace(buf[len-2]);
-            char *pbuf = buf + 5;
+        } else if (strcmp("exec", argv[0]) == 0) {
+            int bg = argv[argc-1][0] == '&';
+            // remove cmd and last '&' from args
+            argc -= bg + 1;
 #ifdef S_CORE
-            char arg[BUFSIZE];
-            uint64_t args[4];
-            for (; argc<4; argc++) {
-                while (isspace(*pbuf)) pbuf++;
-                int i;
-                for (i=0; pbuf[i] != '\0' && !isspace(pbuf[i]); i++)
-                    arg[i] = pbuf[i];
-                if (!i)  // no arg
-                    break;
-                arg[i] = '\0';
-                args[argc] = atoi(arg);
-                pbuf += i;
-            }
             // no arg
-            if (argc == 0) {
-                printf("Error: taskid can't be empty\nUsage: exec id [arg0] ... [arg3]\n");
+            if (!argc) {
+                printf("Error: task id can't be empty\nUsage: exec id [arg0] ... [arg3]\n");
                 continue;
             }
             // exec
-            pid_t pid = sys_exec(args[0], argc-1, args[1], args[2], args[3]);
+            pid_t pid = sys_exec(atoi(argv[1]), argc-1, atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
 #else
-            char *argv[BUFSIZE / 2];
-            while (*pbuf) {
-                while (isspace(*pbuf)) pbuf++;
-                // pbuf -> start of an arg
-                argv[argc++] = pbuf;
-                while (!isspace(*pbuf) && *pbuf) pbuf++;
-                // pbuf -> next ch of the end of an arg, should be space or '\0'
-                if (*pbuf) *pbuf++ = '\0';
-            }
-            // remove last '&' from args
-            argc -= bg;
             // no arg
-            if (argc == 0) {
-                printf("Error: name can't be empty\nUsage: exec name [arg0] ...\n");
+            if (!argc) {
+                printf("Error: task name can't be empty\nUsage: exec name [arg0] ...\n");
                 continue;
             }
             // exec
-            pid_t pid = sys_exec(argv[0], argc, argv);
+            pid_t pid = sys_exec(argv[1], argc, argv+1);
 #endif
             if (!pid) {
                 printf("Execute failed\n");
@@ -139,23 +137,20 @@ int main(void) {
                 sys_waitpid(pid);
                 printf("Done\n");
             }
-        } else if (iscmd("kill", buf)) {
-            if (!lstrip(buf+4)) {
+        } else if (strcmp("exit", argv[0]) == 0) {
+            printf("Bye\n");
+            sys_kill(self);
+        } else if (strcmp("kill", argv[0]) == 0) {
+            if (argc == 1) {
                 printf("Error: pid can't be empty\nUsage: kill pid\n");
                 continue;
             }
-            pid_t pid = atoi(buf+4);
+            pid_t pid = atoi(argv[1]);
             if (pid == 0) {
                 printf("Error: pid can't be 0\n");
                 continue;
-            } else if (pid == self) {
-                printf("Warning: you're trying to kill the shell\nConfirm (y/N)? ");
-                getline(buf, BUFSIZE);
-                lower(buf);
-                if (!(strcmp("y", buf)==0 || strcmp("yes", buf)==0)) {
-                    printf("Abort\n");
-                    continue;
-                }
+            } else if (pid == self && !confirm("Warning: you're trying to kill the shell\n", 0)) {
+                continue;
             }
             int retval = sys_kill(pid);
             switch (retval) {
@@ -171,7 +166,7 @@ int main(void) {
             default:
                 printf("Internal Error\n");
             }
-        } else if (iscmd("help", buf)) {
+        } else if (strcmp("help", argv[0]) == 0) {
             printf("--- HELP START ---\n");
             printf("\tps\n");
             printf("\tclear\n");
@@ -224,7 +219,11 @@ static int getline(char buf[], int bufsize) {
             buf[--len] = '\0';
             backspace();
             break;
-        case '\033':
+        case 3: case 4: // ctrl+c / ctrl+d
+            clearline(len);
+            buf[len=0] = '\0';
+            break;
+        case 27:
             /* handle control:
              * up:    \033[A
              * down:  \033[B
