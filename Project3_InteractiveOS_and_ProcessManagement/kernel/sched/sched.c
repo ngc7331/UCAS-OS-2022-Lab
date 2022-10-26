@@ -228,7 +228,7 @@ int do_kill(pid_t pid) {
         logging(LOG_CRITICAL, "scheduler", "trying to kill init, abort\n");
         return -1;
     }
-    logging(LOG_INFO, "scheduler", "%d.%s kill %d\n", current_running->pid, current_running->name, pid);
+    logging(LOG_INFO, "scheduler", "%d.%s.%d kill %d\n", current_running->pid, current_running->name, current_running->tid, pid);
     int retval = 0;
     // kill process and its threads
     for (int i=0; i<pcb_n; i++) {
@@ -237,15 +237,18 @@ int do_kill(pid_t pid) {
             while (!list_is_empty(&pcb[i].wait_list)) {
                 do_unblock(&pcb[i].wait_list);
             }
-            // FIXME: collect unreleased locks?
+            // forced release all locks, this will do nothing if proc doesnt hold any lock
             do_mutex_lock_release_f(pcb[i].pid);
+            // FIXME: barrier?
             // do kill
             pcb[i].status = TASK_EXITED;
             // remove pcb from any queue, this will do nothing if pcb is not in a queue
             list_delete(&pcb[i].list);
             // return success
             retval = 1;
-            logging(LOG_INFO, "scheduler", "%d.%s.%d is killed\n", pcb[i].pid, pcb[i].name, pcb[i].tid);
+            // log
+            logging(LOG_INFO, "scheduler", "%d.%s.%d %s\n",
+                    pcb[i].pid, pcb[i].name, pcb[i].tid, pid==current_running->pid ? "exited" : "is killed");
             // shell is killed, warn and restart
             if (strcmp("shell", pcb[i].name) == 0) {
                 init_shell();

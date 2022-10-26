@@ -99,9 +99,9 @@ static void init_syscall(void) {
     syscall[SYSCALL_LOCK_ACQ]      = (long (*)()) do_mutex_lock_acquire;
     syscall[SYSCALL_LOCK_RELEASE]  = (long (*)()) do_mutex_lock_release;
     // syscall[SYSCALL_SHOW_TASK]     = (long (*)()) do_process_show;  // FIXME?
-    // syscall[SYSCALL_BARR_INIT]     = (long (*)()) do_barrier_init
-    // syscall[SYSCALL_BARR_WAIT]     = (long (*)()) do_barrier_wait;
-    // syscall[SYSCALL_BARR_DESTROY]  = (long (*)()) do_barrier_destroy;
+    syscall[SYSCALL_BARR_INIT]     = (long (*)()) do_barrier_init;
+    syscall[SYSCALL_BARR_WAIT]     = (long (*)()) do_barrier_wait;
+    syscall[SYSCALL_BARR_DESTROY]  = (long (*)()) do_barrier_destroy;
     // syscall[SYSCALL_COND_INIT]     = (long (*)()) do_condition_init;
     // syscall[SYSCALL_COND_WAIT]     = (long (*)()) do_condition_wait;
     // syscall[SYSCALL_COND_SIGNAL]   = (long (*)()) do_condition_signal;
@@ -145,6 +145,7 @@ int main(void) {
 
     // Init lock mechanism o(´^｀)o
     init_locks();
+    init_barriers();
     logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
 
      // Init interrupt (^_^)
