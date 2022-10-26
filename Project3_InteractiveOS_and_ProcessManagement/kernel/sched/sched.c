@@ -284,8 +284,11 @@ void do_process_show(void) {
     printk("| idx | PID | name             | status  |\n");
     for (int i=0; i<pcb_n; i++) {
         char buf[17] = "                ";
+        // collapse name longer than 15
         int len = strlen(pcb[i].name);
         strncpy(buf, pcb[i].name, len<16 ? len : 16);
+        if (len > 16)
+            buf[13] = buf[14] = buf[15] = '.';
         printk("| %03d | %03d | %s | %s |\n", i, pcb[i].pid, buf, status_dict[pcb[i].status]);
     }
     printk("------------ PROCESS TABLE END ------------\n");
