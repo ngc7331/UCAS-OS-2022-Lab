@@ -17,14 +17,15 @@ int main(int argc, int arg0)
 
     // Launch child processes
     pid_t pids[NUM_TB];
-    
+
     // Start three test programs
     for (int i = 0; i < NUM_TB; ++i)
     {
-        // TODO: [P3-TASK2 S-core] use your "test_barrier" id here        
-        int tb_id = -1;
+        // use your "test_barrier" id here
+        // NOTE: this may change on different device
+        int tb_id = 3;
         assert(tb_id != -1);
-        pids[i] = sys_exec(tb_id, 2, print_location + i, handle, 0);       
+        pids[i] = sys_exec(tb_id, 2, print_location + i, handle, 0);
     }
 
     // Wait child processes to exit
