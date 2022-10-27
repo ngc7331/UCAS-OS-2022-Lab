@@ -67,6 +67,7 @@ void do_barrier_destroy(int bar_idx) {
             current_running->pid, current_running->name, current_running->tid, bar_idx);
     bars[bar_idx].allocated = 0;
     bars[bar_idx].now = bars[bar_idx].goal = 0;
-    while (!list_is_empty(&bars[bar_idx].block_queue))
-        do_unblock(&bars[bar_idx].block_queue);
+    list_init(&bars[bar_idx].block_queue);
+    // while (!list_is_empty(&bars[bar_idx].block_queue))
+    //     do_unblock(&bars[bar_idx].block_queue);
 }
