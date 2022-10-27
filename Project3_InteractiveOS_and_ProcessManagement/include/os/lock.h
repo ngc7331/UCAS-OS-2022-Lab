@@ -78,9 +78,10 @@ int do_barrier_init(int key, int goal);
 void do_barrier_wait(int bar_idx);
 void do_barrier_destroy(int bar_idx);
 
-typedef struct condition
-{
-    // TODO [P3-TASK2 condition]
+typedef struct condition {
+    list_head block_queue;
+    int key;
+    int allocated;
 } condition_t;
 
 #define CONDITION_NUM 16
