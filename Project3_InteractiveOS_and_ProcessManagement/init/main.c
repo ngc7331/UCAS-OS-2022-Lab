@@ -76,9 +76,18 @@ static void init_pcb0(void) {
     );
 }
 
+static void invalid_syscall(long arg0, long arg1, long arg2, long arg3, long arg4) {
+    logging(LOG_CRITICAL, "init", "invalid syscall\n");
+    logging(LOG_CRITICAL, "init", "...args[]=%ld %ld %ld %ld %ld\n", arg0, arg1, arg2, arg3, arg4);
+    printk("invalid syscall\n");
+    assert(0);
+}
+
 static void init_syscall(void) {
     // initialize system call table.
     // see arch/riscv/include/asm/unistd.h
+    for (int i=0; i<NUM_SYSCALLS; i++)
+        syscall[i] = (long (*)()) invalid_syscall;
     syscall[SYSCALL_EXEC]          = (long (*)()) do_exec;
     syscall[SYSCALL_EXIT]          = (long (*)()) do_exit;
     syscall[SYSCALL_SLEEP]         = (long (*)()) do_sleep;
