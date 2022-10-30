@@ -72,6 +72,11 @@ void sys_move_cursor_r(int x, int y) {
     invoke_syscall(SYSCALL_CURSOR_R, x, y, IGNORE, IGNORE, IGNORE);
 }
 
+void sys_set_scroll_base(int base) {
+    // set scroll down base
+    invoke_syscall(SYSCALL_SET_SC_BASE, base, IGNORE, IGNORE, IGNORE, IGNORE);
+}
+
 int sys_mutex_init(int key)
 {
     /* call invoke_syscall to implement sys_mutex_init */

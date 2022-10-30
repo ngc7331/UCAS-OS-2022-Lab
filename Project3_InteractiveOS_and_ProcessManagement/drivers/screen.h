@@ -30,6 +30,9 @@
 /* configuring screen properties */
 void init_screen(void);
 
+/* set scroll base */
+void screen_set_scroll_base(int base);
+
 /* clear screen */
 void screen_clear(void);
 

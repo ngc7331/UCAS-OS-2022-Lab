@@ -6,12 +6,14 @@
 #include <os/kernel.h>
 
 #define SCREEN_WIDTH    80
-#define SCREEN_HEIGHT   50
+#define SCREEN_HEIGHT   40
 #define SCREEN_LOC(x, y) ((y) * SCREEN_WIDTH + (x))
 
 /* screen buffer */
 char new_screen[SCREEN_HEIGHT * SCREEN_WIDTH] = {0};
 char old_screen[SCREEN_HEIGHT * SCREEN_WIDTH] = {0};
+
+int scroll_base = 0;
 
 /* cursor position */
 static void vt100_move_cursor(int x, int y)
@@ -48,11 +50,20 @@ static void screen_write_ch(char ch)
     {
         current_running->cursor_x = 0;
         current_running->cursor_y++;
+        while (current_running->cursor_y >= SCREEN_HEIGHT) {
+            current_running->cursor_y --;
+            strncpy(new_screen + SCREEN_LOC(0, scroll_base),
+                    new_screen + SCREEN_LOC(0, scroll_base + 1),
+                    SCREEN_WIDTH * (SCREEN_HEIGHT - 1 - scroll_base)
+            );
+            for (int i=0; i<SCREEN_WIDTH; i++)
+                new_screen[SCREEN_LOC(i, SCREEN_HEIGHT - 1)] = ' ';
+        }
     }
     else
     {
         new_screen[SCREEN_LOC(current_running->cursor_x, current_running->cursor_y)] = ch;
-        current_running->cursor_x++;
+        current_running->cursor_x++;  // FIXME: this may overflow to next line?
     }
 }
 
@@ -61,6 +72,10 @@ void init_screen(void)
     vt100_hidden_cursor();
     vt100_clear();
     screen_clear();
+}
+
+void screen_set_scroll_base(int base) {
+    scroll_base = base;
 }
 
 void screen_clear(void)
