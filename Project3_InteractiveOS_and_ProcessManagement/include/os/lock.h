@@ -99,6 +99,7 @@ typedef struct mailbox {
     char name[MAX_MBOX_LENGTH+1];
     char buf[MAX_MBOX_LENGTH+1];
     int size;
+    int rp;
     mutex_lock_t lock;
     condition_t empty, full;
     int allocated;
