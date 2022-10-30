@@ -95,16 +95,20 @@ void do_condition_destroy(int cond_idx);
 
 #define MAX_MBOX_LENGTH (64)
 
-typedef struct mailbox
-{
-    // TODO [P3-TASK2 mailbox]
+typedef struct mailbox {
+    char name[MAX_MBOX_LENGTH+1];
+    char buf[MAX_MBOX_LENGTH+1];
+    int size;
+    mutex_lock_t lock;
+    condition_t empty, full;
+    int allocated;
 } mailbox_t;
 
 #define MBOX_NUM 16
-void init_mbox();
+void init_mbox(void);
 int do_mbox_open(char *name);
 void do_mbox_close(int mbox_idx);
-int do_mbox_send(int mbox_idx, void * msg, int msg_length);
-int do_mbox_recv(int mbox_idx, void * msg, int msg_length);
+int do_mbox_send(int mbox_idx, void *msg, int msg_length);
+int do_mbox_recv(int mbox_idx, void *msg, int msg_length);
 
 #endif

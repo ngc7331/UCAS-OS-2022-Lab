@@ -117,10 +117,10 @@ static void init_syscall(void) {
     syscall[SYSCALL_COND_SIGNAL]   = (long (*)()) do_condition_signal;
     syscall[SYSCALL_COND_BROADCAST]= (long (*)()) do_condition_broadcast;
     syscall[SYSCALL_COND_DESTROY]  = (long (*)()) do_condition_destroy;
-    // syscall[SYSCALL_MBOX_OPEN]     = (long (*)()) do_mbox_open;
-    // syscall[SYSCALL_MBOX_CLOSE]    = (long (*)()) do_mbox_close;
-    // syscall[SYSCALL_MBOX_SEND]     = (long (*)()) do_mbox_send;
-    // syscall[SYSCALL_MBOX_RECV]     = (long (*)()) do_mbox_recv;
+    syscall[SYSCALL_MBOX_OPEN]     = (long (*)()) do_mbox_open;
+    syscall[SYSCALL_MBOX_CLOSE]    = (long (*)()) do_mbox_close;
+    syscall[SYSCALL_MBOX_SEND]     = (long (*)()) do_mbox_send;
+    syscall[SYSCALL_MBOX_RECV]     = (long (*)()) do_mbox_recv;
     syscall[SYSCALL_THREAD_CREATE] = (long (*)()) thread_create;
     syscall[SYSCALL_THREAD_JOIN]   = (long (*)()) thread_join;
     syscall[SYSCALL_THREAD_EXIT]   = (long (*)()) thread_exit;
