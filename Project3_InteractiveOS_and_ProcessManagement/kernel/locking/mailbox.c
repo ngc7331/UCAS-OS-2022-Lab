@@ -10,7 +10,7 @@ mailbox_t mboxes[MBOX_NUM];
 
 static void _do_mutex_lock_acquire(mutex_lock_t *mlock) {
     // acquire mutex lock
-    if (atomic_swap_d(LOCKED, (ptr_t)mlock->lock.status) == UNLOCKED) {
+    if (atomic_swap_d(LOCKED, (ptr_t)(&(mlock->lock.status))) == UNLOCKED) {
     } else {
         do_block(current_running, &mlock->block_queue);
     }
@@ -44,6 +44,7 @@ void init_mbox(void) {
         mboxes[i].allocated = 0;
         // init lock
         mboxes[i].lock.lock.status = UNLOCKED;
+        list_init(&mboxes[i].lock.block_queue);
         // init cond
         list_init(&mboxes[i].full.block_queue);
         list_init(&mboxes[i].empty.block_queue);
@@ -97,14 +98,43 @@ void do_mbox_close(int mbox_idx) {
 
 int do_mbox_send(int mbox_idx, void *msg, int msg_length) {
     _do_mutex_lock_acquire(&mboxes[mbox_idx].lock);
-    // TODO
+    logging(LOG_INFO, "locking", "%d.%s.%d send %d bytes to mailbox[%d] %s\n",
+            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+    // wait until msgbox is available
+    while (MAX_MBOX_LENGTH - mboxes[mbox_idx].size - msg_length < 0) {
+        _do_condition_wait(&mboxes[mbox_idx].full, &mboxes[mbox_idx].lock);
+    }
+    // send
+    for (int i=0; i<msg_length; i++)
+        mboxes[mbox_idx].buf[mboxes[mbox_idx].size + i] = ((char *) msg)[i];
+
+    logging(LOG_INFO, "locking", "%d.%s.%d send %d bytes to mailbox[%d] %s + %d, success\n",
+            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name, mboxes[mbox_idx].size);
+    mboxes[mbox_idx].size += msg_length;
+    _do_condition_signal(&mboxes[mbox_idx].empty);
     _do_mutex_lock_release(&mboxes[mbox_idx].lock);
     return 0;
 }
 
 int do_mbox_recv(int mbox_idx, void *msg, int msg_length) {
     _do_mutex_lock_acquire(&mboxes[mbox_idx].lock);
-    // TODO
+    logging(LOG_INFO, "locking", "%d.%s.%d recv %d bytes from mailbox[%d] %s\n",
+            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+    // wait until msgbox is available
+    while (mboxes[mbox_idx].size < msg_length) {
+        _do_condition_wait(&mboxes[mbox_idx].empty, &mboxes[mbox_idx].lock);
+    }
+    // recv
+    for (int i=0; i<msg_length; i++)
+        ((char *) msg)[i] = mboxes[mbox_idx].buf[i];
+    // move buf
+    for (int i=msg_length, j=0; i<MAX_MBOX_LENGTH; i++, j++)
+        mboxes[mbox_idx].buf[j] = mboxes[mbox_idx].buf[i];
+
+    logging(LOG_INFO, "locking", "%d.%s.%d recv %d bytes from mailbox[%d] %s success\n",
+            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+    mboxes[mbox_idx].size -= msg_length;
+    _do_condition_signal(&mboxes[mbox_idx].full);
     _do_mutex_lock_release(&mboxes[mbox_idx].lock);
     return 0;
 }

@@ -157,6 +157,7 @@ int main(void) {
     init_locks();
     init_barriers();
     init_conditions();
+    init_mbox();
     logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
 
      // Init interrupt (^_^)
