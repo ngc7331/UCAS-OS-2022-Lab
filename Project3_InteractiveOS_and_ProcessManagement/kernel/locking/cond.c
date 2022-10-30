@@ -34,14 +34,17 @@ int do_condition_init(int key) {
             }
         }
     }
-    // allocate success
     if (idx >= 0) {
+        // allocate success
         conds[idx].allocated ++;
         conds[idx].key = key;
         logging(LOG_INFO, "locking", "%d.%s.%d get condition[%d] with key=%d\n",
                 current_running->pid, current_running->name, current_running->tid, idx, key);
+    } else {
+        // allocate failed
+        logging(LOG_WARNING, "locking", "%d.%s.%d init condition failed\n",
+                current_running->pid, current_running->name, current_running->tid);
     }
-    // allocate failed
     // enable_preempt();
     return idx;
 }

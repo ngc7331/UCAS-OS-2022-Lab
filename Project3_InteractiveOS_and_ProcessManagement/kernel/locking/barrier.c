@@ -36,15 +36,18 @@ int do_barrier_init(int key, int goal) {
             }
         }
     }
-    // allocate success
     if (idx >= 0) {
+        // allocate success
         bars[idx].allocated ++;
         bars[idx].key = key;
         bars[idx].goal = goal;
         logging(LOG_INFO, "locking", "%d.%s.%d get barrier[%d] with key=%d, goal=%d\n",
                 current_running->pid, current_running->name, current_running->tid, idx, key, goal);
+    } else {
+        // allocate failed
+        logging(LOG_WARNING, "locking", "%d.%s.%d init barrier failed\n",
+                current_running->pid, current_running->name, current_running->tid);
     }
-    // allocate failed
     // enable_preempt();
     return idx;
 }

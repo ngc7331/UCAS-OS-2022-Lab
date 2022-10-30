@@ -63,12 +63,16 @@ int do_mutex_lock_init(int key)
             }
         }
     }
-    // allocate success
     if (idx >= 0) {
+        // allocate success
         mlocks[idx].allocated ++;
         mlocks[idx].key = key;
         logging(LOG_INFO, "locking", "%d.%s.%d get mlock[%d] with key=%d\n",
                 current_running->pid, current_running->name, current_running->tid, idx, key);
+    } else {
+        // allocate failed
+        logging(LOG_WARNING, "locking", "%d.%s.%d init mlock failed\n",
+                current_running->pid, current_running->name, current_running->tid);
     }
     // allocate failed
     // enable_preempt();
