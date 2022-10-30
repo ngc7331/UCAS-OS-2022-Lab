@@ -25,11 +25,13 @@ int do_condition_init(int key) {
             break;
         }
     }
-    // allocate a new cond
-    for (int i=0; i<CONDITION_NUM; i++) {
-        if (conds[i].allocated == 0) {
-            idx = i;
-            break;
+    if (idx < 0) {
+        // allocate a new cond
+        for (int i=0; i<CONDITION_NUM; i++) {
+            if (conds[i].allocated == 0) {
+                idx = i;
+                break;
+            }
         }
     }
     // allocate success

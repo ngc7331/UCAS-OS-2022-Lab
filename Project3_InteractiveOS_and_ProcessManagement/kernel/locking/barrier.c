@@ -27,11 +27,13 @@ int do_barrier_init(int key, int goal) {
             break;
         }
     }
-    // allocate a new barrier
-    for (int i=0; i<BARRIER_NUM; i++) {
-        if (bars[i].allocated == 0) {
-            idx = i;
-            break;
+    if (idx < 0) {
+        // allocate a new barrier
+        for (int i=0; i<BARRIER_NUM; i++) {
+            if (bars[i].allocated == 0) {
+                idx = i;
+                break;
+            }
         }
     }
     // allocate success

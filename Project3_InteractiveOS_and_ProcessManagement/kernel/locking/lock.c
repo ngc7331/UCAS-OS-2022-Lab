@@ -54,11 +54,13 @@ int do_mutex_lock_init(int key)
             break;
         }
     }
-    // allocate a new lock
-    for (int i=0; i<LOCK_NUM; i++) {
-        if (mlocks[i].allocated == 0) {
-            idx = i;
-            break;
+    if (idx < 0) {
+        // allocate a new lock
+        for (int i=0; i<LOCK_NUM; i++) {
+            if (mlocks[i].allocated == 0) {
+                idx = i;
+                break;
+            }
         }
     }
     // allocate success
