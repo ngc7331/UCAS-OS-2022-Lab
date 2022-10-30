@@ -1,30 +1,3 @@
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * * *
- *            Copyright (C) 2018 Institute of Computing Technology, CAS
- *               Author : Han Shukai (email : hanshukai@ict.ac.cn)
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * * *
- *                  The shell acts as a task running in user mode.
- *       The main function is to make system calls through the user's output.
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * * *
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this
- * software and associated documentation files (the "Software"), to deal in the Software
- * without restriction, including without limitation the rights to use, copy, modify,
- * merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit
- * persons to whom the Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *  * * * * * * * * * * */
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -36,8 +9,10 @@
 #define BUFSIZE 64
 #define HISTSIZE 16
 
-static char getchar();
-static int getline(char buf[], int bufsize);
+pid_t self;
+char history[HISTSIZE][BUFSIZE];
+int hp = 0;
+
 int round_add(int *a, int b, int lim, int orig) {
     int tmp = *a;
     *a += b;
@@ -46,8 +21,82 @@ int round_add(int *a, int b, int lim, int orig) {
     return orig ? tmp : *a;
 }
 
-char history[HISTSIZE][BUFSIZE];
-int hp = 0;
+char getchar() {
+    int ch;
+    while ((ch=sys_getchar()) == -1);
+    return ch;
+}
+
+void putchar(char ch) {
+    char buf[2] = {ch, '\0'};
+    sys_write(buf);
+    sys_reflush();
+}
+
+void backspace() {
+    sys_move_cursor_r(-1, 0);
+    sys_write(" ");
+    sys_move_cursor_r(-1, 0);
+    sys_reflush();
+}
+
+void clearline(int len) {
+    char blank[] = "                                ";
+    int blank_size = 32;
+    sys_move_cursor_r(-len, 0);
+    sys_write(blank);
+    sys_move_cursor_r(-blank_size, 0);
+    sys_reflush();
+}
+
+int getline(char buf[], int bufsize) {
+    int tmphp = hp;
+    int len = 0;
+    char ch;
+    while ((ch=getchar()) != '\n' && ch != '\r' && len < bufsize-1) {
+        switch (ch) {
+        case '\b': case 127:
+            if (!len) break;
+            buf[--len] = '\0';
+            backspace();
+            break;
+        case 3: // ctrl+c
+            clearline(len);
+            buf[len=0] = '\0';
+            break;
+        case 4: case 12: // ctrl+d / ctrl+l
+            buf[0] = ch;
+            buf[1] = '\0';
+            return 0;
+        case 27:
+            /* handle control:
+             * up:    \033[A
+             * down:  \033[B
+             * right: \033\000[C\000
+             * left:  \033\000[D\000
+             */
+            if (getchar() == '\000')  // align to '['
+                getchar();
+            if ((ch=getchar()) == 'A' || ch == 'B') {
+                strcpy(buf, history[round_add(&tmphp, ch=='A' ? -1 : 1, HISTSIZE, 0)]);
+                clearline(len);
+                sys_write(buf);
+                sys_reflush();
+                len = strlen(buf);
+            } else { // 'C' || 'D'
+                // FIXME: do nothing now
+                getchar(); // remove '\000'
+            }
+            break;
+        default:
+            buf[len++] = ch;
+            putchar(ch);
+        }
+    }
+    putchar('\n');
+    buf[len] = '\0';
+    return len;
+}
 
 static void init_shell() {
     sys_clear();
@@ -70,12 +119,18 @@ static int confirm(char msg[], int d) {
     return 1;
 }
 
+static void exit() {
+    printf("Bye\n");
+    sys_kill(self);
+}
+
 int main(void) {
+    self = sys_getpid();
+    sys_set_scroll_base(SHELL_BEGIN + 1);
     init_shell();
 
     char buf[BUFSIZE];
 
-    pid_t self = sys_getpid();
     printf("Shell inited: pid=%d\n", self);
 
     while (1)
@@ -83,11 +138,15 @@ int main(void) {
         printf("> root@UCAS_OS: ");
         // call syscall to read UART port & parse input
         int len = getline(buf, BUFSIZE);
-        len = strip(buf);
-        // just continue if nothing is inputed
-        if (!len) continue;
+        if (!len) {
+            if (buf[0] == 4) exit();              // ctrl+d
+            else if (buf[0] == 12) init_shell();  // ctrl+l
+            continue;
+        } else if (!(len = strip(buf))) {
+            continue;
+        }
         // record history for up/down
-        strncpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf, len);
+        strcpy(history[round_add(&hp, 1, HISTSIZE, 1)], buf);
 
         // argparser
         int argc = 0;
@@ -138,8 +197,7 @@ int main(void) {
                 printf("Done\n");
             }
         } else if (strcmp("exit", argv[0]) == 0) {
-            printf("Bye\n");
-            sys_kill(self);
+            exit();
         } else if (strcmp("kill", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: pid can't be empty\nUsage: kill pid\n");
@@ -168,87 +226,19 @@ int main(void) {
             }
         } else if (strcmp("help", argv[0]) == 0) {
             printf("--- HELP START ---\n");
-            printf("\tps\n");
-            printf("\tclear\n");
-            printf("\texec name [arg0] ...\n");
-            printf("\tkill pid\n");
+            printf("  ps: show processes\n");
+            printf("  clear: clear screen\n");
+            printf("  exec name [arg0] ...: start a new process\n");
+            printf("  kill pid: kill a existing process\n");
+            printf("  exit: exit shell\n");
+            printf("  shortcut keys:\n");
+            printf("     Ctrl+C: clear line\n");
+            printf("     Ctrl+D: exit shell\n");
+            printf("     Ctrl+L: clear screen\n");
             printf("---- HELP END ----\n");
         } else {
             printf("Command %s not found\n", buf);
         }
     }
     return 0;
-}
-
-static char getchar() {
-    int ch;
-    while ((ch=sys_getchar()) == -1);
-    return ch;
-}
-
-static void putchar(char ch) {
-    char buf[2] = {ch, '\0'};
-    sys_write(buf);
-    sys_reflush();
-}
-
-static void backspace() {
-    sys_move_cursor_r(-1, 0);
-    sys_write(" ");
-    sys_move_cursor_r(-1, 0);
-    sys_reflush();
-}
-
-static void clearline(int len) {
-    char blank[] = "                                ";
-    int blank_size = 32;
-    sys_move_cursor_r(-len, 0);
-    sys_write(blank);
-    sys_move_cursor_r(-blank_size, 0);
-    sys_reflush();
-}
-
-static int getline(char buf[], int bufsize) {
-    int tmphp = hp;
-    int len = 0;
-    char ch;
-    while ((ch=getchar()) != '\n' && ch != '\r' && len < bufsize-1) {
-        switch (ch) {
-        case '\b': case 127:
-            if (!len) break;
-            buf[--len] = '\0';
-            backspace();
-            break;
-        case 3: case 4: // ctrl+c / ctrl+d
-            clearline(len);
-            buf[len=0] = '\0';
-            break;
-        case 27:
-            /* handle control:
-             * up:    \033[A
-             * down:  \033[B
-             * right: \033\000[C\000
-             * left:  \033\000[D\000
-             */
-            if (getchar() == '\000')  // align to '['
-                getchar();
-            if ((ch=getchar()) == 'A' || ch == 'B') {
-                strcpy(buf, history[round_add(&tmphp, ch=='A' ? -1 : 1, HISTSIZE, 0)]);
-                clearline(len);
-                sys_write(buf);
-                sys_reflush();
-                len = strlen(buf);
-            } else { // 'C' || 'D'
-                // FIXME: do nothing now
-                getchar(); // remove '\000'
-            }
-            break;
-        default:
-            buf[len++] = ch;
-            putchar(ch);
-        }
-    }
-    putchar('\n');
-    buf[len] = '\0';
-    return len;
 }
