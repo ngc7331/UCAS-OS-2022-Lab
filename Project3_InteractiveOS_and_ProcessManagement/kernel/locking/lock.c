@@ -86,17 +86,15 @@ void do_mutex_lock_acquire(int mlock_idx)
     if (atomic_swap_d(LOCKED, (ptr_t)&mlocks[mlock_idx].lock.status) == UNLOCKED) {
         logging(LOG_INFO, "locking", "%d.%s.%d acquire mlock[%d] successfully\n",
                 current_running->pid, current_running->name, current_running->tid, mlock_idx);
-        // record pid
-        mlocks[mlock_idx].pid = current_running->pid;
         // enable_preempt();
     } else {
         logging(LOG_INFO, "locking", "%d.%s.%d acquire mlock[%d] failed, block\n",
                 current_running->pid, current_running->name, current_running->tid, mlock_idx);
         // enable_preempt();
         do_block(current_running, &mlocks[mlock_idx].block_queue);
-        // unblocked, record pid
-        mlocks[mlock_idx].pid = current_running->pid;
     }
+    // record pid
+    mlocks[mlock_idx].pid = current_running->pid;
 }
 
 void do_mutex_lock_release(int mlock_idx)
@@ -107,14 +105,13 @@ void do_mutex_lock_release(int mlock_idx)
         logging(LOG_INFO, "locking", "%d.%s.%d release mlock[%d] successfully\n",
                 current_running->pid, current_running->name, current_running->tid, mlock_idx);
         mlocks[mlock_idx].lock.status = UNLOCKED;
-        mlocks[mlock_idx].pid = 0;
     } else {
         logging(LOG_INFO, "locking", "%d.%s.%d release mlock[%d] successfully, unblock a process from queue\n",
                 current_running->pid, current_running->name, current_running->tid, mlock_idx);
-        // no need to modify mlock.pid, since the unblocked proc will modify it
         do_unblock(&mlocks[mlock_idx].block_queue);
     }
     // enable_preempt();
+    mlocks[mlock_idx].pid = 0;
 }
 
 void do_mutex_lock_release_f(pid_t pid) {

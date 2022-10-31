@@ -97,8 +97,7 @@ static void init_pcb_stack(
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
-    pt_switchto->regs[1] = user_stack;
-    for (int i=2; i<14; i++)
+    for (int i=1; i<14; i++)
         pt_switchto->regs[i] = 0;
 }
 
@@ -225,7 +224,7 @@ void do_exit(void) {
 
 int do_kill(pid_t pid) {
     if (pid == 0) {
-        logging(LOG_CRITICAL, "scheduler", "trying to kill init, abort\n");
+        logging(LOG_ERROR, "scheduler", "trying to kill init, abort\n");
         return -1;
     }
     logging(LOG_INFO, "scheduler", "%d.%s.%d kill %d\n", current_running->pid, current_running->name, current_running->tid, pid);
@@ -268,6 +267,7 @@ int do_waitpid(pid_t pid) {
             if (pcb[i].status != TASK_EXITED)
                 do_block(current_running, &pcb[i].wait_list);
             retval = pid;
+            break;
         }
     }
     return retval;
