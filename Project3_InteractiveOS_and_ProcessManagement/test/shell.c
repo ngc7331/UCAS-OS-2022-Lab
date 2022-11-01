@@ -236,6 +236,8 @@ int main(void) {
             printf("     Ctrl+D: exit shell\n");
             printf("     Ctrl+L: clear screen\n");
             printf("---- HELP END ----\n");
+        } else if (strcmp("tasks", argv[0]) == 0) {
+            sys_show_task();
         } else {
             printf("Command %s not found\n", buf);
         }

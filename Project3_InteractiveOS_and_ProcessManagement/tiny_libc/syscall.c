@@ -95,6 +95,12 @@ void sys_mutex_release(int mutex_idx)
     invoke_syscall(SYSCALL_LOCK_RELEASE, mutex_idx, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
+void sys_show_task(void)
+{
+    /* call invoke_syscall to implement sys_mutex_release */
+    invoke_syscall(SYSCALL_SHOW_TASK, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+}
+
 long sys_get_timebase(void)
 {
     /* call invoke_syscall to implement sys_get_timebase */

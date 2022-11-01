@@ -29,6 +29,9 @@ int sys_mutex_init(int key);
 void sys_mutex_acquire(int mutex_idx);
 void sys_mutex_release(int mutex_idx);
 
+/* show task */
+void sys_show_task(void);
+
 /* thread */
 pid_t sys_thread_create(uint64_t entrypoint, void *arg);
 void sys_thread_join(pid_t tid, void **retval);

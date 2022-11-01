@@ -108,7 +108,7 @@ static void init_syscall(void) {
     syscall[SYSCALL_LOCK_INIT]     = (long (*)()) do_mutex_lock_init;
     syscall[SYSCALL_LOCK_ACQ]      = (long (*)()) do_mutex_lock_acquire;
     syscall[SYSCALL_LOCK_RELEASE]  = (long (*)()) do_mutex_lock_release;
-    // syscall[SYSCALL_SHOW_TASK]     = (long (*)()) do_process_show;  // FIXME?
+    syscall[SYSCALL_SHOW_TASK]     = (long (*)()) do_task_show;
     syscall[SYSCALL_BARR_INIT]     = (long (*)()) do_barrier_init;
     syscall[SYSCALL_BARR_WAIT]     = (long (*)()) do_barrier_wait;
     syscall[SYSCALL_BARR_DESTROY]  = (long (*)()) do_barrier_destroy;
