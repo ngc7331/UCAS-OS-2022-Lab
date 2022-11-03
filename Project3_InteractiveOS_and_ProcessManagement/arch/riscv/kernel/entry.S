@@ -191,6 +191,9 @@ ENTRY(switch_to)
 ENDPROC(switch_to)
 
 ENTRY(ret_from_exception)
+  // unlock kernel
+  call unlock_kernel
+
   /* restore context via provided macro and return to sepc */
   /* HINT: remember to check your sp, does it point to the right address? */
   RESTORE_CONTEXT
@@ -202,6 +205,8 @@ ENTRY(exception_handler_entry)
   // save context via the provided macro
   SAVE_CONTEXT
 
+  // lock kernel to protect critical section
+  call lock_kernel
   /* call interrupt_helper
    * NOTE: don't forget to pass parameters for it.
    */
@@ -213,8 +218,7 @@ ENTRY(exception_handler_entry)
   /* load ret_from_exception into $ra so that we can return to
    * ret_from_exception when interrupt_help complete.
    */
-  lui  ra, %hi(ret_from_exception)
-  addi ra, ra, %lo(ret_from_exception)
+  la   ra, ret_from_exception
   // return to ret_from_exception
   jr   ra
 ENDPROC(exception_handler_entry)

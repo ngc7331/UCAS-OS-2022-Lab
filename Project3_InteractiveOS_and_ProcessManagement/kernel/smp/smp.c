@@ -1,10 +1,11 @@
 #include <atomic.h>
+#include <csr.h>
 #include <os/sched.h>
 #include <os/smp.h>
 #include <os/lock.h>
 #include <os/kernel.h>
 
-static spin_lock_t kernel_lock;
+spin_lock_t kernel_lock;
 
 void smp_init() {
     spin_lock_init(&kernel_lock);
@@ -12,7 +13,12 @@ void smp_init() {
 
 void wakeup_other_hart() {
     send_ipi(NULL);
-    // TODO: clear sip
+    // clear sip
+    asm volatile(
+        "csrw %0, zero\n\r"
+        :
+        : "I" (CSR_SIP)
+    );
 }
 
 void lock_kernel() {

@@ -297,7 +297,7 @@ int printl(const char *fmt, ...)
 
 #define ENABLE_LOGGING
 
-static loglevel_t __level = LOG_VERBOSE;
+loglevel_t __level = LOG_VERBOSE;
 
 int logging(loglevel_t level, const char* name, const char *fmt, ...)
 {

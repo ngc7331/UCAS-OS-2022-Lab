@@ -203,9 +203,6 @@ int main(void) {
         // wake up slave
         logging(LOG_INFO, "init", "Wake up slave core.\n");
         wakeup_other_hart();
-
-        // FIXME: master core stopped, just to test if slave works
-        while (1);
     } else {
         // for slave core
         // init pcb

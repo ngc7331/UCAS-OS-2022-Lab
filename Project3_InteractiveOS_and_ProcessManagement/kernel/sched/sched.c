@@ -173,7 +173,6 @@ void do_scheduler(void) {
 
     // switch_to current_running
     switch_to(prev, current_running[cid]);
-    screen_move_cursor(current_running[cid]->cursor_x, current_running[cid]->cursor_y);
 }
 
 void do_sleep(uint32_t sleep_time) {
@@ -299,7 +298,7 @@ void do_process_show(void) {
             buf[13] = buf[14] = buf[15] = '.';
         printk("| %03d | %03d | %03d | %s | %s |  %c  |\n",
                i, pcb[i].pid, pcb[i].tid, buf, status_dict[pcb[i].status],
-               pcb[i].status == TASK_RUNNING ? pcb[i].cid + '0' : '.');
+               pcb[i].status == TASK_RUNNING ? pcb[i].cid + '0' : '-');
     }
     printk("------------------ PROCESS TABLE END ------------------\n");
 }
