@@ -24,6 +24,7 @@ typedef struct {
     int phyaddr;
     uint64_t entrypoint;
     int execute_on_load;
+    int loaded;
 } task_info_t;
 
 extern task_info_t apps[APP_MAXNUM];

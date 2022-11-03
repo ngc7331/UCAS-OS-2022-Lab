@@ -57,10 +57,13 @@ static void init_task_info(void) {
     task_info_t *task = (task_info_t *) load_img(APP_MEM_BASE, phyaddr,
                                                  sizeof(task_info_t) * tasknum, FALSE);
     for (int i=0; i<tasknum; i++) {
-        if (task->type == APP)
+        if (task->type == APP) {
+            apps[appnum].loaded = 0;
             apps[appnum++] = *task++;
-        else
+        } else {
+            batchs[batchnum].loaded = 0;
             batchs[batchnum++] = *task++;
+        }
     }
 }
 
@@ -156,17 +159,30 @@ void init_shell(void) {
 #endif
 }
 
+static void preload_apps(void) {
+    for (int i=0; i<appnum; i++) {
+        load_task_img(i, APP, 1);
+    }
+}
+
 int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
+        // set log level
+        set_loglevel(LOG_DEBUG);
+
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
+        logging(LOG_INFO, "init", "Jump table initialization succeeded.\n");
 
         // Init task information (〃'▽'〃)
         init_task_info();
+        logging(LOG_INFO, "init", "Task info loaded, apps=%d, batches=%d.\n", appnum, batchnum);
 
-        // set log level
-        set_loglevel(LOG_DEBUG);
+        // preload apps
+        // FIXME: this is to prevent a QEMU bug on calling bios_sdread()
+        preload_apps();
+        logging(LOG_INFO, "init", "APPs preloaded.\n");
 
         // Init Process Control Blocks |•'-'•) ✧
         init_pcb0();
@@ -176,6 +192,7 @@ int main(void) {
 
         // Read CPU frequency (｡•ᴗ-)_
         time_base = bios_read_fdt(TIMEBASE);
+        logging(LOG_INFO, "init", "CPU frequency detected: %ld.\n", time_base);
 
         // Init lock mechanism o(´^｀)o
         init_locks();
@@ -194,7 +211,7 @@ int main(void) {
 
         // Init system call table (0_0)
         init_syscall();
-        logging(LOG_INFO, "init", "System call initialized successfully.\n");
+        logging(LOG_INFO, "init", "System call initialization succeeded.\n");
 
         // Init screen (QAQ)
         init_screen();

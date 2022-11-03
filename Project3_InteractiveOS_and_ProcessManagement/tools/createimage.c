@@ -34,6 +34,7 @@ typedef struct {
     int phyaddr;
     uint64_t entrypoint;
     int execute_on_load;
+    int loaded;
 } task_info_t;
 
 #define APP_MAXNUM 64

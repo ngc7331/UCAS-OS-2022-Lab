@@ -117,7 +117,7 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
 #endif
     if (id < 0 || id >= appnum)
         return 0;
-    load_task_img(id, APP);
+    load_task_img(id, APP, 0);
     pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocKernelPage(1) + PAGE_SIZE;
     pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocUserPage(1) + PAGE_SIZE;
     pcb[pcb_n].pid = ++pid_n;

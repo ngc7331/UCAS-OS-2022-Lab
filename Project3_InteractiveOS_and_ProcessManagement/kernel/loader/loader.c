@@ -36,10 +36,16 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, unsigned int size, int cop
 
 }
 
-uint64_t load_task_img(int taskid, task_type_t type) {
+uint64_t load_task_img(int taskid, task_type_t type, int overwrite) {
     // load task via taskid, which is converted by kernel
-    task_info_t task = type == APP ? apps[taskid] : batchs[taskid];
-    uint64_t memaddr = type == APP ? task.entrypoint : BATCH_MEM_BASE;
+    int is_app = type == APP;
+    task_info_t *task = is_app ? &apps[taskid] : &batchs[taskid];
+    uint64_t memaddr = is_app ? task->entrypoint : BATCH_MEM_BASE;
 
-    return load_img(memaddr, task.phyaddr, task.size, type==APP);
+    // FIXME: batches?
+    if (task->loaded && !overwrite)
+        return memaddr;
+
+    task->loaded = 1;
+    return load_img(memaddr, task->phyaddr, task->size, is_app);
 }
