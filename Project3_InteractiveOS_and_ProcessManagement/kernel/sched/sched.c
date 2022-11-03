@@ -81,7 +81,7 @@ static void init_pcb_stack(
     pt_argv[argc] = NULL;
     pt_regs->regs[11] = (reg_t) pt_argv;
     // alignment
-    user_sp = (char *) ROUNDDOWN(user_sp, 128);
+    user_sp = (char *) ROUNDDOWN(user_sp, 16);
 #endif
 
     // set sp to simulate just returning from switch_to
