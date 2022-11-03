@@ -43,6 +43,7 @@
 #include <screen.h>
 #include <stdarg.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/time.h>
 #include <os/irq.h>
 #include <os/kernel.h>
@@ -304,18 +305,21 @@ int logging(loglevel_t level, const char* name, const char *fmt, ...)
     return -1;
 #else
     if (level < __level) return -1;
-    char buf[37];
+    char buf[40];
     char __dict[7] = "VDIWEC";
-    int ret = 23;
+    int ret;
     va_list va;
 
     buf[0] = '[';
-    mini_itoa(get_ticks(), 10, 0, 1, buf+1, 20);
-    buf[21] = ']';
-    buf[22] = '[';
-    for (; *name && ret<33; name++)
+    buf[1] = '0' + get_current_cpu_id();
+    buf[2] = ']';
+    buf[3] = '[';
+    mini_itoa(get_ticks(), 10, 0, 1, buf+4, 20);
+    buf[24] = ']';
+    buf[25] = '[';
+    for (ret=26; *name && ret<36; name++)
         buf[ret++] = *name;
-    for (; ret<33; )
+    for (; ret<36; )
         buf[ret++] = ' ';
     buf[ret++] = ']';
     buf[ret++] = '[';

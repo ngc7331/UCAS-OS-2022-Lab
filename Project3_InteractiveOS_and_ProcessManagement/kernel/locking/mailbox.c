@@ -1,6 +1,7 @@
 #include <os/lock.h>
 #include <os/sched.h>
 #include <os/string.h>
+#include <os/smp.h>
 #include <os/list.h>
 #include <os/irq.h>
 #include <atomic.h>
@@ -9,10 +10,11 @@
 mailbox_t mboxes[MBOX_NUM];
 
 static void _do_mutex_lock_acquire(mutex_lock_t *mlock) {
+    int cid = get_current_cpu_id();
     // acquire mutex lock
     if (atomic_swap_d(LOCKED, (ptr_t)(&(mlock->lock.status))) == UNLOCKED) {
     } else {
-        do_block(current_running, &mlock->block_queue);
+        do_block(current_running[cid], &mlock->block_queue);
     }
 }
 
@@ -26,8 +28,9 @@ static void _do_mutex_lock_release(mutex_lock_t *mlock) {
 }
 
 static void _do_condition_wait(condition_t *cond, mutex_lock_t *mlock) {
+    int cid = get_current_cpu_id();
     _do_mutex_lock_release(mlock);
-    do_block(current_running, &cond->block_queue);
+    do_block(current_running[cid], &cond->block_queue);
     _do_mutex_lock_acquire(mlock);
 }
 
@@ -51,6 +54,7 @@ void init_mbox(void) {
 }
 
 int do_mbox_open(char *name) {
+    int cid = get_current_cpu_id();
     // disable_preempt();
     // open a mailbox
     int idx = -1;
@@ -75,19 +79,20 @@ int do_mbox_open(char *name) {
         mboxes[idx].allocated ++;
         strcpy(mboxes[idx].name, name);
         logging(LOG_INFO, "locking", "%d.%s.%d open mailbox[%d] %s\n",
-                current_running->pid, current_running->name, current_running->tid, idx, name);
+                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, idx, name);
     } else {
         // allocate failed
         logging(LOG_WARNING, "locking", "%d.%s.%d open mailbox failed\n",
-                current_running->pid, current_running->name, current_running->tid);
+                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid);
     }
     // enable_preempt();
     return idx;
 }
 
 void do_mbox_close(int mbox_idx) {
+    int cid = get_current_cpu_id();
     logging(LOG_INFO, "locking", "%d.%s.%d close mailbox[%d] %s\n",
-            current_running->pid, current_running->name, current_running->tid, mbox_idx, mboxes[mbox_idx].name);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, mbox_idx, mboxes[mbox_idx].name);
     if (--mboxes[mbox_idx].allocated == 0) {
         mboxes[mbox_idx].size = 0;
         mboxes[mbox_idx].rp = 0;
@@ -101,10 +106,11 @@ void do_mbox_close(int mbox_idx) {
 }
 
 int do_mbox_send(int mbox_idx, void *msg, int msg_length) {
+    int cid = get_current_cpu_id();
     _do_mutex_lock_acquire(&mboxes[mbox_idx].lock);
     int blocked = 0;
     logging(LOG_INFO, "locking", "%d.%s.%d send %d bytes to mailbox[%d] %s\n",
-            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
     // wait until msgbox is available
     while (MAX_MBOX_LENGTH - mboxes[mbox_idx].size - msg_length < 0) {
         blocked ++;
@@ -117,17 +123,18 @@ int do_mbox_send(int mbox_idx, void *msg, int msg_length) {
     mboxes[mbox_idx].size += msg_length;
 
     logging(LOG_INFO, "locking", "%d.%s.%d send %d bytes to mailbox[%d] %s + %d, success\n",
-            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name, mboxes[mbox_idx].size);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, msg_length, mbox_idx, mboxes[mbox_idx].name, mboxes[mbox_idx].size);
     _do_condition_signal(&mboxes[mbox_idx].empty);
     _do_mutex_lock_release(&mboxes[mbox_idx].lock);
     return blocked;
 }
 
 int do_mbox_recv(int mbox_idx, void *msg, int msg_length) {
+    int cid = get_current_cpu_id();
     _do_mutex_lock_acquire(&mboxes[mbox_idx].lock);
     int blocked = 0;
     logging(LOG_INFO, "locking", "%d.%s.%d recv %d bytes from mailbox[%d] %s\n",
-            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
     // wait until msgbox is available
     while (mboxes[mbox_idx].size < msg_length) {
         blocked ++;
@@ -139,7 +146,7 @@ int do_mbox_recv(int mbox_idx, void *msg, int msg_length) {
     mboxes[mbox_idx].size -= msg_length;
 
     logging(LOG_INFO, "locking", "%d.%s.%d recv %d bytes from mailbox[%d] %s success\n",
-            current_running->pid, current_running->name, current_running->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, msg_length, mbox_idx, mboxes[mbox_idx].name);
     _do_condition_signal(&mboxes[mbox_idx].full);
     _do_mutex_lock_release(&mboxes[mbox_idx].lock);
     return blocked;

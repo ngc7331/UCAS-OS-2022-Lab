@@ -3,6 +3,7 @@
 #include <os/loader.h>
 #include <os/lock.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/string.h>
 #include <os/task.h>
 #include <os/time.h>
@@ -13,14 +14,11 @@
 #include <printk.h>
 
 pcb_t pcb[NUM_MAX_TASK];
-const ptr_t pid0_stack = INIT_KERNEL_STACK + PAGE_SIZE;
-pcb_t pid0_pcb = {
-    .pid = 0,
-    .kernel_sp = (ptr_t)pid0_stack,
-    .user_sp = (ptr_t)pid0_stack,
-    .name = "init",
-    .status = TASK_RUNNING
+const ptr_t pid0_stack[2] = {
+    INIT_KERNEL_STACK + 2 * PAGE_SIZE,
+    INIT_KERNEL_STACK + 3 * PAGE_SIZE,
 };
+pcb_t pid0_pcb[2];
 
 // last allocated pid
 int pid_n = 0;
@@ -30,7 +28,7 @@ LIST_HEAD(ready_queue);
 LIST_HEAD(sleep_queue);
 
 /* current running task PCB */
-pcb_t * volatile current_running;
+pcb_t * volatile current_running[2];
 
 /* global process id */
 pid_t process_id = 1;
@@ -147,8 +145,9 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     return pcb[pcb_n++].pid;
 }
 
-void do_scheduler(void)
-{
+void do_scheduler(void) {
+    int cid = get_current_cpu_id();
+
     // Check sleep queue to wake up PCBs
     check_sleeping();
 
@@ -157,7 +156,7 @@ void do_scheduler(void)
         return ;
 
     pcb_t *next = pcb_dequeue(&ready_queue);
-    pcb_t *prev = current_running;
+    pcb_t *prev = current_running[cid];
 
     logging(LOG_VERBOSE, "scheduler", "%d.%s -> %d.%s\n", prev->pid, prev->name, next->pid, next->name);
 
@@ -166,29 +165,30 @@ void do_scheduler(void)
         pcb_enqueue(&ready_queue, prev);
     }
     next->status = TASK_RUNNING;
+    next->cid = cid;
 
     // Modify the current_running pointer.
     process_id = prev->pid;
-    current_running = next;
+    current_running[cid] = next;
 
     // switch_to current_running
-    switch_to(prev, current_running);
-    screen_move_cursor(current_running->cursor_x, current_running->cursor_y);
+    switch_to(prev, current_running[cid]);
+    screen_move_cursor(current_running[cid]->cursor_x, current_running[cid]->cursor_y);
 }
 
-void do_sleep(uint32_t sleep_time)
-{
+void do_sleep(uint32_t sleep_time) {
+    int cid = get_current_cpu_id();
     // sleep(seconds)
     // NOTE: you can assume: 1 second = 1 `timebase` ticks
     // set the wake up time for the blocked task
-    current_running->wakeup_time = get_ticks() + sleep_time * time_base;
-    logging(LOG_INFO, "timer", "set wakeup time %d for %d.%s.%d\n", current_running->wakeup_time, current_running->pid, current_running->name, current_running->tid);
+    current_running[cid]->wakeup_time = get_ticks() + sleep_time * time_base;
+    logging(LOG_INFO, "timer", "set wakeup time %d for %d.%s.%d\n",
+            current_running[cid]->wakeup_time, current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid);
     // call do_block
-    do_block(current_running, &sleep_queue);
+    do_block(current_running[cid], &sleep_queue);
 }
 
-void do_block(pcb_t *pcb, list_head *queue)
-{
+void do_block(pcb_t *pcb, list_head *queue) {
     // block the pcb task into the block queue
     logging(LOG_INFO, "scheduler", "block %d.%s.%d\n", pcb->pid, pcb->name, pcb->tid);
     pcb_enqueue(queue, pcb);
@@ -196,8 +196,7 @@ void do_block(pcb_t *pcb, list_head *queue)
     do_scheduler();
 }
 
-void do_unblock(list_head *queue)
-{
+void do_unblock(list_head *queue) {
     // unblock the `pcb` from the block queue
     pcb_t *pcb = pcb_dequeue(queue);
     logging(LOG_INFO, "scheduler", "unblock %d.%s.%d\n", pcb->pid, pcb->name, pcb->tid);
@@ -207,27 +206,34 @@ void do_unblock(list_head *queue)
 
 #ifdef S_CORE
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
-    logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n", current_running->pid, current_running->name, current_running->tid, id, argc, arg0, arg1, arg2);
+    int cid = get_current_cpu_id();
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, id, argc, arg0, arg1, arg2);
     return init_pcb(id, argc, arg0, arg1, arg2);
 }
 #else
 pid_t do_exec(char *name, int argc, char *argv[]) {
-    logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n", current_running->pid, current_running->name, current_running->tid, name, argc, argv);
+    int cid = get_current_cpu_id();
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, name, argc, argv);
     return init_pcb(name, argc, argv);
 }
 #endif
 
 void do_exit(void) {
-    do_kill(current_running->pid);
+    int cid = get_current_cpu_id();
+    do_kill(current_running[cid]->pid);
     do_scheduler();
 }
 
 int do_kill(pid_t pid) {
+    int cid = get_current_cpu_id();
     if (pid == 0) {
         logging(LOG_ERROR, "scheduler", "trying to kill init, abort\n");
         return -1;
     }
-    logging(LOG_INFO, "scheduler", "%d.%s.%d kill %d\n", current_running->pid, current_running->name, current_running->tid, pid);
+    logging(LOG_INFO, "scheduler", "%d.%s.%d kill %d\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, pid);
     int retval = 0;
     // kill process and its threads
     for (int i=0; i<pcb_n; i++) {
@@ -247,7 +253,7 @@ int do_kill(pid_t pid) {
             retval = 1;
             // log
             logging(LOG_INFO, "scheduler", "%d.%s.%d %s\n",
-                    pcb[i].pid, pcb[i].name, pcb[i].tid, pid==current_running->pid ? "exited" : "is killed");
+                    pcb[i].pid, pcb[i].name, pcb[i].tid, pid==current_running[cid]->pid ? "exited" : "is killed");
             // shell is killed, warn and restart
             if (strcmp("shell", pcb[i].name) == 0) {
                 init_shell();
@@ -260,12 +266,14 @@ int do_kill(pid_t pid) {
 }
 
 int do_waitpid(pid_t pid) {
+    int cid = get_current_cpu_id();
     int retval = 0;
-    logging(LOG_INFO, "scheduler", "%d.%s wait %d\n", current_running->pid, current_running->name, pid);
+    logging(LOG_INFO, "scheduler", "%d.%s wait %d\n",
+            current_running[cid]->pid, current_running[cid]->name, pid);
     for (int i=0; i<pcb_n; i++) {
         if (pcb[i].pid == pid && pcb[i].type == TYPE_PROCESS) {
             if (pcb[i].status != TASK_EXITED)
-                do_block(current_running, &pcb[i].wait_list);
+                do_block(current_running[cid], &pcb[i].wait_list);
             retval = pid;
             break;
         }
@@ -280,8 +288,8 @@ void do_process_show(void) {
         "READY  ",
         "EXITED "
     };
-    printk("----------- PROCESS TABLE START -----------\n");
-    printk("| idx | PID | name             | status  |\n");
+    printk("----------------- PROCESS TABLE START -----------------\n");
+    printk("| idx | PID | TID | name             | status  | cpu |\n");
     for (int i=0; i<pcb_n; i++) {
         char buf[17] = "                ";
         // collapse name longer than 15
@@ -289,11 +297,14 @@ void do_process_show(void) {
         strncpy(buf, pcb[i].name, len<16 ? len : 16);
         if (len > 16)
             buf[13] = buf[14] = buf[15] = '.';
-        printk("| %03d | %03d | %s | %s |\n", i, pcb[i].pid, buf, status_dict[pcb[i].status]);
+        printk("| %03d | %03d | %03d | %s | %s |  %c  |\n",
+               i, pcb[i].pid, pcb[i].tid, buf, status_dict[pcb[i].status],
+               pcb[i].status == TASK_RUNNING ? pcb[i].cid + '0' : '.');
     }
-    printk("------------ PROCESS TABLE END ------------\n");
+    printk("------------------ PROCESS TABLE END ------------------\n");
 }
 
 pid_t do_getpid(void) {
-    return current_running->pid;
+    int cid = get_current_cpu_id();
+    return current_running[cid]->pid;
 }

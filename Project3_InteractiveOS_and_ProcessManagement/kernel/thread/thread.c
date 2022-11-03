@@ -3,6 +3,7 @@
 #include <os/mm.h>
 #include <os/sched.h>
 #include <os/string.h>
+#include <os/smp.h>
 #include <os/thread.h>
 #include <printk.h>
 
@@ -49,28 +50,30 @@ static void init_pcb_stack(
 }
 
 static int newtid() {
-    if (current_running->type == TYPE_PROCESS) {
-        return current_running->tid++;
+    int cid = get_current_cpu_id();
+    if (current_running[cid]->type == TYPE_PROCESS) {
+        return current_running[cid]->tid++;
     }
     for (int i=0; i<=pcb_n; i++) {
-        if (pcb[i].pid == current_running->pid && pcb[i].type == TYPE_PROCESS)
+        if (pcb[i].pid == current_running[cid]->pid && pcb[i].type == TYPE_PROCESS)
             return pcb[i].tid++;
     }
     return 0;
 }
 
 pid_t thread_create(uint64_t entrypoint, void *arg) {
+    int cid = get_current_cpu_id();
     pcb_t new;
     regs_context_t regs;
     regs.regs[10] = (reg_t) arg;
     new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
     new.user_sp = allocUserPage(1) + PAGE_SIZE;
-    new.pid = current_running->pid;
+    new.pid = current_running[cid]->pid;
     new.tid = newtid();
     new.type = TYPE_THREAD;
-    strcpy(new.name, current_running->name);
-    new.cursor_x = current_running->cursor_x;
-    new.cursor_y = current_running->cursor_y;
+    strcpy(new.name, current_running[cid]->name);
+    new.cursor_x = current_running[cid]->cursor_x;
+    new.cursor_y = current_running[cid]->cursor_y;
     new.status = TASK_READY;
     new.retval = NULL;
     new.joined = NULL;
@@ -88,54 +91,56 @@ pid_t thread_create(uint64_t entrypoint, void *arg) {
 }
 
 void thread_join(pid_t tid, void **retval) {
+    int cid = get_current_cpu_id();
     // find sub by tid
     pcb_t *sub = NULL;
     for (int i=0; i<pcb_n; i++) {
-        if (pcb[i].pid == current_running->pid && pcb[i].type == TYPE_THREAD && pcb[i].tid == tid)
+        if (pcb[i].pid == current_running[cid]->pid && pcb[i].type == TYPE_THREAD && pcb[i].tid == tid)
             sub = &pcb[i];
     }
     // invalid tid
     if (sub == NULL) {
-        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not found\n", current_running->pid, current_running->name, tid);
+        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not found\n", current_running[cid]->pid, current_running[cid]->name, tid);
         return ;
     }
 
     // try join
     // disable_preempt();
     if (sub->joined != NULL) {
-        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not joinable\n", current_running->pid, current_running->name, tid);
+        logging(LOG_CRITICAL, "thread", "%d.%s trying to join thread %d: not joinable\n", current_running[cid]->pid, current_running[cid]->name, tid);
         logging(LOG_DEBUG, "thread", "...sub.joined=%x\n", sub->joined);
         // enable_preempt();
         return ;
     }
-    sub->joined = current_running;
+    sub->joined = current_running[cid];
     // enable_preempt();
 
     // wait until sub is exited
     if (sub->status != TASK_EXITED) {
-        logging(LOG_INFO, "thread", "%d.%s waiting for thread %d\n", current_running->pid, current_running->name, tid);
-        current_running->status = TASK_BLOCKED;
+        logging(LOG_INFO, "thread", "%d.%s waiting for thread %d\n", current_running[cid]->pid, current_running[cid]->name, tid);
+        current_running[cid]->status = TASK_BLOCKED;
         do_scheduler();
     }
 
     // return
     if (retval != NULL) {
-        logging(LOG_INFO, "thread", "%d.%s join thread %d complete, get retval=%ld\n", current_running->pid, current_running->name, tid, sub->retval);
+        logging(LOG_INFO, "thread", "%d.%s join thread %d complete, get retval=%ld\n", current_running[cid]->pid, current_running[cid]->name, tid, sub->retval);
         *retval = sub->retval;
     } else {
-        logging(LOG_INFO, "thread", "%d.%s join thread %d complete\n", current_running->pid, current_running->name, tid);
+        logging(LOG_INFO, "thread", "%d.%s join thread %d complete\n", current_running[cid]->pid, current_running[cid]->name, tid);
     }
 }
 
 void thread_exit(void *retval) {
-    logging(LOG_INFO, "thread", "%d.%s.%d exited, retval=%ld\n", current_running->pid, current_running->name, current_running->tid, (long) retval);
+    int cid = get_current_cpu_id();
+    logging(LOG_INFO, "thread", "%d.%s.%d exited, retval=%ld\n", current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, (long) retval);
     // wake up joined task
-    if (current_running->joined != NULL) {
-        current_running->joined->status = TASK_READY;
-        pcb_enqueue(&ready_queue, current_running->joined);
+    if (current_running[cid]->joined != NULL) {
+        current_running[cid]->joined->status = TASK_READY;
+        pcb_enqueue(&ready_queue, current_running[cid]->joined);
     }
-    current_running->retval = retval;
-    current_running->status = TASK_EXITED;
+    current_running[cid]->retval = retval;
+    current_running[cid]->status = TASK_EXITED;
 
     // FIXME: garbage collecter?
 

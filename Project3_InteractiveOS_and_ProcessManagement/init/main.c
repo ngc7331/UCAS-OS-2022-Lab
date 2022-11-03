@@ -9,6 +9,7 @@
 #include <os/lock.h>
 #include <os/mm.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/string.h>
 #include <os/task.h>
 #include <os/time.h>
@@ -64,15 +65,36 @@ static void init_task_info(void) {
 }
 
 static void init_pcb0(void) {
-    // set pid0_pcb.kernel_sp
-    pid0_pcb.kernel_sp -= sizeof(regs_context_t);
+    int cid = get_current_cpu_id();
+    // set sp
+    pid0_pcb[cid].kernel_sp = pid0_pcb[cid].kernel_stack_base = pid0_stack[cid];
+    pid0_pcb[cid].user_sp = pid0_pcb[cid].user_stack_base = pid0_stack[cid];
+    pid0_pcb[cid].kernel_sp -= sizeof(regs_context_t);
+
+    // init list
+    list_init(&pid0_pcb[cid].list);
+    list_init(&pid0_pcb[cid].wait_list);
+
+    // set identifier
+    pid0_pcb[cid].pid = pid0_pcb[cid].tid = 0;
+    pid0_pcb[cid].type = TYPE_PROCESS;
+    strcpy(pid0_pcb[cid].name, "init");
+
+    // set cid
+    pid0_pcb[cid].cid = cid;
+
+    // set cursor
+    pid0_pcb[cid].cursor_x = pid0_pcb[cid].cursor_y = 0;
+
+    // set status
+    pid0_pcb[cid].status = TASK_RUNNING;
 
     // initialize 'current_running'
-    current_running = &pid0_pcb;
+    current_running[cid] = &pid0_pcb[cid];
     asm volatile(
         "add tp, %0, zero\n\r"
         :
-        : "r"(current_running)
+        : "r"(current_running[cid])
     );
 }
 
@@ -135,42 +157,65 @@ void init_shell(void) {
 }
 
 int main(void) {
-    // Init jump table provided by BIOS (ΦωΦ)
-    init_jmptab();
+    if (get_current_cpu_id() == 0) {
+        // for master core
+        // Init jump table provided by BIOS (ΦωΦ)
+        init_jmptab();
 
-    // Init task information (〃'▽'〃)
-    init_task_info();
+        // Init task information (〃'▽'〃)
+        init_task_info();
 
-    // set log level
-    set_loglevel(LOG_DEBUG);
+        // set log level
+        set_loglevel(LOG_DEBUG);
 
-    // Init Process Control Blocks |•'-'•) ✧
-    init_pcb0();
-    logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
-    init_shell();
-    logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
+        // Init Process Control Blocks |•'-'•) ✧
+        init_pcb0();
+        logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+        init_shell();
+        logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
-    // Read CPU frequency (｡•ᴗ-)_
-    time_base = bios_read_fdt(TIMEBASE);
+        // Read CPU frequency (｡•ᴗ-)_
+        time_base = bios_read_fdt(TIMEBASE);
 
-    // Init lock mechanism o(´^｀)o
-    init_locks();
-    init_barriers();
-    init_conditions();
-    init_mbox();
-    logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
+        // Init lock mechanism o(´^｀)o
+        init_locks();
+        init_barriers();
+        init_conditions();
+        init_mbox();
+        logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
 
-     // Init interrupt (^_^)
-    init_exception();
-    logging(LOG_INFO, "init", "Interrupt processing initialization succeeded.\n");
+        // Init interrupt (^_^)
+        init_exception();
+        logging(LOG_INFO, "init", "Interrupt processing initialization succeeded.\n");
 
-    // Init system call table (0_0)
-    init_syscall();
-    logging(LOG_INFO, "init", "System call initialized successfully.\n");
+        // Init smp
+        smp_init();
+        logging(LOG_INFO, "init", "SMP initialization succeeded.\n");
 
-    // Init screen (QAQ)
-    init_screen();
-    logging(LOG_INFO, "init", "SCREEN initialization succeeded.\n");
+        // Init system call table (0_0)
+        init_syscall();
+        logging(LOG_INFO, "init", "System call initialized successfully.\n");
+
+        // Init screen (QAQ)
+        init_screen();
+        logging(LOG_INFO, "init", "SCREEN initialization succeeded.\n");
+
+        // wake up slave
+        logging(LOG_INFO, "init", "Wake up slave core.\n");
+        wakeup_other_hart();
+
+        // FIXME: master core stopped, just to test if slave works
+        while (1);
+    } else {
+        // for slave core
+        // init pcb
+        init_pcb0();
+        logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+
+        // setup exception
+        setup_exception();
+        logging(LOG_INFO, "init", "Interrupt processing initialization succeeded.\n");
+    }
 
     // Setup timer interrupt and enable all interrupt globally
     // NOTE: The function of sstatus.sie is different from sie's

@@ -8,11 +8,13 @@
 
 #define BUF_LEN 10
 
+int print_location = 0;
+
 int main(int argc, char *argv[])
 {
     assert(argc >= 1);
-    int print_location = (argc == 1) ? 0 : atoi(argv[1]);
-
+    // int print_location = (argc == 1) ? 0 : atoi(argv[1]);
+    print_location ++;
 
     // Init two mutex locks, and convert decimal handle to string via itoa
     int handle1 = sys_mutex_init(LOCK1_KEY);

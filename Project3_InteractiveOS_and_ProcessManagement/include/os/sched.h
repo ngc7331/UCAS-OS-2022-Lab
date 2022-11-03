@@ -106,6 +106,9 @@ typedef struct pcb
     pid_t tid;
     pcb_type_t type;
 
+    /* core id */
+    int cid;
+
     /* process name */
     char name[32];
 
@@ -136,12 +139,12 @@ extern list_head ready_queue;
 extern list_head sleep_queue;
 
 /* current running task PCB */
-extern pcb_t * volatile current_running;
+extern pcb_t * volatile current_running[2];
 extern pid_t process_id;
 
 extern pcb_t pcb[NUM_MAX_TASK];
-extern pcb_t pid0_pcb;
-extern const ptr_t pid0_stack;
+extern pcb_t pid0_pcb[2];
+extern const ptr_t pid0_stack[2];
 extern int pcb_n;
 
 // #define S_CORE

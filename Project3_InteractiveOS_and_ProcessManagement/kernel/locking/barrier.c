@@ -1,5 +1,6 @@
 #include <os/lock.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/list.h>
 #include <os/irq.h>
 #include <atomic.h>
@@ -17,6 +18,7 @@ void init_barriers(void) {
 }
 
 int do_barrier_init(int key, int goal) {
+    int cid = get_current_cpu_id();
     // disable_preempt();
     // initialize barrier
     int idx = -1;
@@ -42,34 +44,36 @@ int do_barrier_init(int key, int goal) {
         bars[idx].key = key;
         bars[idx].goal = goal;
         logging(LOG_INFO, "locking", "%d.%s.%d get barrier[%d] with key=%d, goal=%d\n",
-                current_running->pid, current_running->name, current_running->tid, idx, key, goal);
+                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, idx, key, goal);
     } else {
         // allocate failed
         logging(LOG_WARNING, "locking", "%d.%s.%d init barrier failed\n",
-                current_running->pid, current_running->name, current_running->tid);
+                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid);
     }
     // enable_preempt();
     return idx;
 }
 
 void do_barrier_wait(int bar_idx) {
+    int cid = get_current_cpu_id();
     if (++bars[bar_idx].now >= bars[bar_idx].goal) {
         // reached goal, unblock all
         logging(LOG_INFO, "locking", "%d.%s.%d reached barrier[%d], goal!\n",
-            current_running->pid, current_running->name, current_running->tid, bar_idx);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, bar_idx);
         bars[bar_idx].now = 0;
         while (!list_is_empty(&bars[bar_idx].block_queue))
             do_unblock(&bars[bar_idx].block_queue);
     } else {
         logging(LOG_INFO, "locking", "%d.%s.%d reached barrier[%d], waiting (%d/%d)\n",
-            current_running->pid, current_running->name, current_running->tid, bar_idx, bars[bar_idx].now, bars[bar_idx].goal);
-        do_block(current_running, &bars[bar_idx].block_queue);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, bar_idx, bars[bar_idx].now, bars[bar_idx].goal);
+        do_block(current_running[cid], &bars[bar_idx].block_queue);
     }
 }
 
 void do_barrier_destroy(int bar_idx) {
+    int cid = get_current_cpu_id();
     logging(LOG_INFO, "locking", "%d.%s.%d destroy barrier[%d]\n",
-            current_running->pid, current_running->name, current_running->tid, bar_idx);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, bar_idx);
     bars[bar_idx].allocated = 0;
     bars[bar_idx].now = bars[bar_idx].goal = 0;
     list_init(&bars[bar_idx].block_queue);

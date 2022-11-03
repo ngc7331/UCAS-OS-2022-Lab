@@ -7,12 +7,17 @@
 #include <csr.h>
 
 #define KERNEL_STACK		0x50500000
+#define PAGE_SIZE           4096
 
 .section ".entry_function","ax"
 ENTRY(_start)
   /* Mask all interrupts */
   csrw CSR_SIE, zero
   csrw CSR_SIP, zero
+
+  /* read coreid */
+  csrr t2, CSR_MHARTID
+  bne  t2, zero, secondary
 
   /* clear BSS for flat non-ELF images */
   lui  t0, %hi(__bss_start)
@@ -27,9 +32,15 @@ clstart:
   blt  t0, t1, clstart
 clend:
 
-  /* setup C environment */
-  lui  sp, %hi(KERNEL_STACK)
-  addi sp, sp, %lo(KERNEL_STACK)
+  /* setup sp */
+  la  sp, KERNEL_STACK
+  call main
+
+secondary:
+  /* setup sp */
+  la  sp, KERNEL_STACK
+  la  t0, PAGE_SIZE
+  add sp, sp, t0
   call main
 
 loop:

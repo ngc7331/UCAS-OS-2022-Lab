@@ -2,6 +2,7 @@
 #include <printk.h>
 #include <os/string.h>
 #include <os/sched.h>
+#include <os/smp.h>
 #include <os/irq.h>
 #include <os/kernel.h>
 
@@ -16,42 +17,38 @@ char old_screen[SCREEN_HEIGHT * SCREEN_WIDTH] = {0};
 int scroll_base = 0;
 
 /* cursor position */
-static void vt100_move_cursor(int x, int y)
-{
+static void vt100_move_cursor(int x, int y) {
     // \033[y;xH
     printv("%c[%d;%dH", 27, y, x);
 }
 
 /* clear screen */
-static void vt100_clear()
-{
+static void vt100_clear() {
     // \033[2J
     printv("%c[2J", 27);
 }
 
 /* hidden cursor */
-static void vt100_hidden_cursor()
-{
+static void vt100_hidden_cursor() {
     // \033[?25l
     printv("%c[?25l", 27);
 }
 
 /* display cursor */
-// static void vt100_display_cursor()
-// {
+// static void vt100_display_cursor() {
 //     // \033[?25h
 //     printv("%c[?25h", 27);
 // }
 
 /* write a char */
-static void screen_write_ch(char ch)
-{
+static void screen_write_ch(char ch) {
+    int cid = get_current_cpu_id();
     if (ch == '\n')
     {
-        current_running->cursor_x = 0;
-        current_running->cursor_y++;
-        while (current_running->cursor_y >= SCREEN_HEIGHT) {
-            current_running->cursor_y --;
+        current_running[cid]->cursor_x = 0;
+        current_running[cid]->cursor_y++;
+        while (current_running[cid]->cursor_y >= SCREEN_HEIGHT) {
+            current_running[cid]->cursor_y --;
             strncpy(new_screen + SCREEN_LOC(0, scroll_base),
                     new_screen + SCREEN_LOC(0, scroll_base + 1),
                     SCREEN_WIDTH * (SCREEN_HEIGHT - 1 - scroll_base)
@@ -62,13 +59,12 @@ static void screen_write_ch(char ch)
     }
     else
     {
-        new_screen[SCREEN_LOC(current_running->cursor_x, current_running->cursor_y)] = ch;
-        current_running->cursor_x++;  // FIXME: this may overflow to next line?
+        new_screen[SCREEN_LOC(current_running[cid]->cursor_x, current_running[cid]->cursor_y)] = ch;
+        current_running[cid]->cursor_x++;  // FIXME: this may overflow to next line?
     }
 }
 
-void init_screen(void)
-{
+void init_screen(void) {
     vt100_hidden_cursor();
     vt100_clear();
     screen_clear();
@@ -78,8 +74,8 @@ void screen_set_scroll_base(int base) {
     scroll_base = base;
 }
 
-void screen_clear(void)
-{
+void screen_clear(void) {
+    int cid = get_current_cpu_id();
     int i, j;
     for (i = 0; i < SCREEN_HEIGHT; i++)
     {
@@ -88,22 +84,22 @@ void screen_clear(void)
             new_screen[SCREEN_LOC(j, i)] = ' ';
         }
     }
-    current_running->cursor_x = 0;
-    current_running->cursor_y = 0;
+    current_running[cid]->cursor_x = 0;
+    current_running[cid]->cursor_y = 0;
     screen_reflush();
 }
 
-void screen_move_cursor(int x, int y)
-{
-    current_running->cursor_x = x;
-    current_running->cursor_y = y;
+void screen_move_cursor(int x, int y) {
+    int cid = get_current_cpu_id();
+    current_running[cid]->cursor_x = x;
+    current_running[cid]->cursor_y = y;
     vt100_move_cursor(x, y);
 }
 
-void screen_move_cursor_r(int x, int y)
-{
-    int nx = current_running->cursor_x + x;
-    int ny = current_running->cursor_y + y;
+void screen_move_cursor_r(int x, int y) {
+    int cid = get_current_cpu_id();
+    int nx = current_running[cid]->cursor_x + x;
+    int ny = current_running[cid]->cursor_y + y;
     if (nx < 0) nx = 0;
     if (nx > SCREEN_WIDTH) nx = SCREEN_WIDTH;
     if (ny < 0) ny = 0;
@@ -111,8 +107,7 @@ void screen_move_cursor_r(int x, int y)
     screen_move_cursor(nx, ny);
 }
 
-void screen_write(char *buff)
-{
+void screen_write(char *buff) {
     int i = 0;
     int l = strlen(buff);
 
@@ -128,8 +123,8 @@ void screen_write(char *buff)
  * the fact that in order to speed up printing, we only refresh
  * the characters that have been modified since this time.
  */
-void screen_reflush(void)
-{
+void screen_reflush(void) {
+    int cid = get_current_cpu_id();
     int i, j;
 
     /* here to reflush screen buffer to serial port */
@@ -148,5 +143,5 @@ void screen_reflush(void)
     }
 
     /* recover cursor position */
-    vt100_move_cursor(current_running->cursor_x, current_running->cursor_y);
+    vt100_move_cursor(current_running[cid]->cursor_x, current_running[cid]->cursor_y);
 }
