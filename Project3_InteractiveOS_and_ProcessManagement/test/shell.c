@@ -229,15 +229,31 @@ int main(void) {
             printf("  ps: show processes\n");
             printf("  clear: clear screen\n");
             printf("  exec name [arg0] ...: start a new process\n");
-            printf("  kill pid: kill a existing process\n");
             printf("  exit: exit shell\n");
+            printf("  kill pid: kill a existing process\n");
+            printf("  help: print this help message\n");
+            printf("  ts: show tasks\n");
+            printf("  taskset -p mask pid / taskset mask name [arg0] ...: set pid's mask\n");
             printf("  shortcut keys:\n");
             printf("     Ctrl+C: clear line\n");
             printf("     Ctrl+D: exit shell\n");
             printf("     Ctrl+L: clear screen\n");
             printf("---- HELP END ----\n");
-        } else if (strcmp("tasks", argv[0]) == 0) {
+        } else if (strcmp("ts", argv[0]) == 0) {
             sys_show_task();
+        } else if (strcmp("taskset", argv[0]) == 0) {
+            unsigned mask;
+            pid_t pid;
+            if (strcmp("-p", argv[1]) == 0) {
+                mask = atoi(argv[2]);
+                pid = atoi(argv[3]);
+            } else {
+                mask = atoi(argv[1]);
+                pid = sys_exec(argv[2], argc-2, argv+2);
+                printf("Process created with pid=%d\n", pid);
+            }
+            sys_taskset(pid, mask);
+            printf("Set pid=%d's mask=0x%04x\n", pid, mask);
         } else {
             printf("Command %s not found\n", buf);
         }

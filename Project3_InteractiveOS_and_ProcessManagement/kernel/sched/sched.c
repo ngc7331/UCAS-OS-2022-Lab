@@ -301,8 +301,8 @@ void do_process_show(void) {
         "READY  ",
         "EXITED "
     };
-    printk("-------------------- PROCESS TABLE START --------------------\n");
-    printk("| idx | PID | TID | name             | status  | cpu | mask |\n");
+    printk("--------------------- PROCESS TABLE START ---------------------\n");
+    printk("| idx | PID | TID | name             | status  | cpu |  mask  |\n");
     for (int i=0; i<pcb_n; i++) {
         char buf[17] = "                ";
         // collapse name longer than 15
@@ -310,11 +310,11 @@ void do_process_show(void) {
         strncpy(buf, pcb[i].name, len<16 ? len : 16);
         if (len > 16)
             buf[13] = buf[14] = buf[15] = '.';
-        printk("| %03d | %03d | %03d | %s | %s |  %c  | %04x |\n",
+        printk("| %03d | %03d | %03d | %s | %s |  %c  | 0x%04x |\n",
                i, pcb[i].pid, pcb[i].tid, buf, status_dict[pcb[i].status],
                pcb[i].status == TASK_RUNNING ? pcb[i].cid + '0' : '-', pcb[i].mask);
     }
-    printk("--------------------- PROCESS TABLE END ---------------------\n");
+    printk("---------------------- PROCESS TABLE END ----------------------\n");
 }
 
 pid_t do_getpid(void) {
