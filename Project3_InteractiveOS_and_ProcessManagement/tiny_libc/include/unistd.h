@@ -76,4 +76,7 @@ void sys_mbox_close(int mbox_id);
 int sys_mbox_send(int mbox_idx, void *msg, int msg_length);
 int sys_mbox_recv(int mbox_idx, void *msg, int msg_length);
 
+/* smp */
+void sys_taskset(pid_t pid, unsigned mask);
+
 #endif

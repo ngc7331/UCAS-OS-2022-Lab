@@ -83,8 +83,9 @@ static void init_pcb0(void) {
     pid0_pcb[cid].type = TYPE_PROCESS;
     strcpy(pid0_pcb[cid].name, "init");
 
-    // set cid
+    // set cpu
     pid0_pcb[cid].cid = cid;
+    pid0_pcb[cid].mask = 0xFFFF;
 
     // set cursor
     pid0_pcb[cid].cursor_x = pid0_pcb[cid].cursor_y = 0;
@@ -121,6 +122,7 @@ static void init_syscall(void) {
     syscall[SYSCALL_PS]            = (long (*)()) do_process_show;
     syscall[SYSCALL_GETPID]        = (long (*)()) do_getpid;
     syscall[SYSCALL_YIELD]         = (long (*)()) do_scheduler;
+    syscall[SYSCALL_TASKSET]       = (long (*)()) do_taskset;
     syscall[SYSCALL_WRITE]         = (long (*)()) screen_write;
     syscall[SYSCALL_READCH]        = (long (*)()) bios_getchar;
     syscall[SYSCALL_CURSOR]        = (long (*)()) screen_move_cursor;

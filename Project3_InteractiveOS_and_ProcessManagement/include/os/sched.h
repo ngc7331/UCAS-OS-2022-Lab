@@ -106,8 +106,9 @@ typedef struct pcb
     pid_t tid;
     pcb_type_t type;
 
-    /* core id */
+    /* cpu */
     int cid;
+    unsigned mask;
 
     /* process name */
     char name[32];
@@ -164,15 +165,16 @@ void do_unblock(list_node_t *);
 
 /* exec exit kill waitpid ps*/
 #ifdef S_CORE
-extern pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
+pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else
-extern pid_t do_exec(char *name, int argc, char *argv[]);
+pid_t do_exec(char *name, int argc, char *argv[]);
 #endif
-extern void do_exit(void);
-extern int do_kill(pid_t pid);
-extern int do_waitpid(pid_t pid);
-extern void do_process_show();
-extern pid_t do_getpid();
+void do_exit(void);
+int do_kill(pid_t pid);
+int do_waitpid(pid_t pid);
+void do_process_show();
+pid_t do_getpid();
 
+void do_taskset(pid_t pid, unsigned mask);
 
 #endif
