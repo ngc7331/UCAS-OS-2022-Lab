@@ -167,7 +167,7 @@ int main(void) {
         } else if (strcmp("clear", argv[0]) == 0) {
             init_shell();
         } else if (strcmp("exec", argv[0]) == 0) {
-            int bg = argv[argc-1][0] == '&';
+            int bg = argv[argc-1][0] == '&' && argv[argc-1][1] == '\0';
             // remove cmd and last '&' from args
             argc -= bg + 1;
 #ifdef S_CORE
@@ -177,7 +177,9 @@ int main(void) {
                 continue;
             }
             // exec
-            pid_t pid = sys_exec(atoi(argv[1]), argc-1, atoi(argv[2]), atoi(argv[3]), atoi(argv[4]));
+            pid_t pid = sys_exec(atoi(argv[1]), argc, argc>0 ? atoi(argv[2]) : 0,
+                                                      argc>1 ? atoi(argv[3]) : 0,
+                                                      argc>2 ? atoi(argv[4]) : 0);
 #else
             // no arg
             if (!argc) {
@@ -241,6 +243,7 @@ int main(void) {
             printf("---- HELP END ----\n");
         } else if (strcmp("ts", argv[0]) == 0) {
             sys_show_task();
+#ifndef S_CORE
         } else if (strcmp("taskset", argv[0]) == 0) {
             unsigned mask;
             pid_t pid;
@@ -254,6 +257,7 @@ int main(void) {
             }
             sys_taskset(pid, mask);
             printf("Set pid=%d's mask=0x%04x\n", pid, mask);
+#endif
         } else {
             printf("Command %s not found\n", buf);
         }
