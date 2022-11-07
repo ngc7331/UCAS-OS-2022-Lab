@@ -159,20 +159,22 @@ void do_scheduler(void) {
     // Check sleep queue to wake up PCBs
     check_sleeping();
 
-    // no more tasks
-    if (list_is_empty(&ready_queue))
-        return ;
-
     pcb_t *prev = current_running[cid];
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);
-    if (next == NULL)
-        return ;
+    if (next == NULL) {
+        if (pid0_pcb[0].status == TASK_READY)
+            next = &pid0_pcb[0];
+        else if (pid0_pcb[1].status == TASK_READY)
+            next = &pid0_pcb[1];
+        else return ;
+    }
 
     logging(LOG_VERBOSE, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;
-        pcb_enqueue(&ready_queue, prev);
+        if (prev->pid != 0)
+            pcb_enqueue(&ready_queue, prev);
     }
     next->status = TASK_RUNNING;
     next->cid = cid;
