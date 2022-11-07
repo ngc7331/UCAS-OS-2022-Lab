@@ -72,11 +72,10 @@ int getline(char buf[], int bufsize) {
             /* handle control:
              * up:    \033[A
              * down:  \033[B
-             * right: \033\000[C\000
-             * left:  \033\000[D\000
+             * right: \033[C
+             * left:  \033[D
              */
-            if (getchar() == '\000')  // align to '['
-                getchar();
+            getchar(); // remove '['
             if ((ch=getchar()) == 'A' || ch == 'B') {
                 strcpy(buf, history[round_add(&tmphp, ch=='A' ? -1 : 1, HISTSIZE, 0)]);
                 clearline(len);
@@ -85,7 +84,6 @@ int getline(char buf[], int bufsize) {
                 len = strlen(buf);
             } else { // 'C' || 'D'
                 // FIXME: do nothing now
-                getchar(); // remove '\000'
             }
             break;
         default:
@@ -234,6 +232,7 @@ int main(void) {
             printf("  exit: exit shell\n");
             printf("  kill pid: kill a existing process\n");
             printf("  help: print this help message\n");
+            printf("  history: show cmd history\n");
             printf("  ts: show tasks\n");
             printf("  taskset -p mask pid / taskset mask name [arg0] ...: set pid's mask\n");
             printf("  shortcut keys:\n");
@@ -241,6 +240,10 @@ int main(void) {
             printf("     Ctrl+D: exit shell\n");
             printf("     Ctrl+L: clear screen\n");
             printf("---- HELP END ----\n");
+        } else if (strcmp("history", argv[0]) == 0) {
+            for (int i=0; i<HISTSIZE; i++) {
+                printf("[%02d] %s\n", i, history[(i + hp) % HISTSIZE]);
+            }
         } else if (strcmp("ts", argv[0]) == 0) {
             sys_show_task();
 #ifndef S_CORE
