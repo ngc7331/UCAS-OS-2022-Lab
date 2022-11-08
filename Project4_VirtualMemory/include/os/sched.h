@@ -94,6 +94,9 @@ typedef struct pcb
     /* wait list */
     list_head wait_list;
 
+    /* pgdir */
+    uintptr_t pgdir;
+
     /* process id & thread id
      * for TYPE_PROCESS:
      *   pid is valid
