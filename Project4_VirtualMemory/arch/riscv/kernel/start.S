@@ -22,11 +22,10 @@ ENTRY(_boot)
 
   la sp, boot_stack_top_base
 
-  csrr a0, CSR_MHARTID 
+  csrr a0, CSR_MHARTID
 
   // this will never return
   call boot_kernel
-
 
 loop:
   wfi

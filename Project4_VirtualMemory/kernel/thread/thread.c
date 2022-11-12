@@ -66,8 +66,8 @@ pid_t thread_create(uint64_t entrypoint, void *arg) {
     pcb_t new;
     regs_context_t regs;
     regs.regs[10] = (reg_t) arg;
-    new.kernel_sp = allocKernelPage(1) + PAGE_SIZE;
-    new.user_sp = allocUserPage(1) + PAGE_SIZE;
+    new.kernel_sp = allocPage(1) + PAGE_SIZE;
+    new.user_sp = allocPage(1) + PAGE_SIZE;
     new.pid = current_running[cid]->pid;
     new.tid = newtid();
     new.type = TYPE_THREAD;

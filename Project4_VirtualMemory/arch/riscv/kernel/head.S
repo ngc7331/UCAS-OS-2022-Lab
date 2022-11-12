@@ -6,7 +6,6 @@
 #include <asm.h>
 #include <csr.h>
 
-#define KERNEL_STACK		0x50500000
 #define PAGE_SIZE           4096
 
 ENTRY(_start)
@@ -19,10 +18,8 @@ ENTRY(_start)
   bne  t2, zero, secondary
 
   /* clear BSS for flat non-ELF images */
-  lui  t0, %hi(__bss_start)
-  addi t0, t0, %lo(__bss_start)
-  lui  t1, %hi(_end)
-  addi t1, t1, %lo(_end)
+  la  t0, __bss_start
+  la  t1, _end
   // for (i=__bss_start; i<_end; i+=4) MEM[i]=0;
   bge  t0, t1, clend
 clstart:
@@ -32,14 +29,15 @@ clstart:
 clend:
 
   /* setup sp */
-  la  sp, KERNEL_STACK
+  la   t0, pid0_stack
+  ld   sp, (t0)
   call main
 
 secondary:
   /* setup sp */
-  la  sp, KERNEL_STACK
-  la  t0, PAGE_SIZE
-  add sp, sp, t0
+  la   t0, pid0_stack
+  addi t0, t0, 8
+  ld   sp, (t0)
   call main
 
 loop:

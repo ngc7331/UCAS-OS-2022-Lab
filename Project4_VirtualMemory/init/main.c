@@ -19,7 +19,7 @@
 #include <sys/syscall.h>
 #include <type.h>
 
-#define TASK_NUM_LOC 0x502001fa
+#define TASK_NUM_LOC 0xffffffc0502001fa
 #define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
 
 // tasks
@@ -184,7 +184,7 @@ int main(void) {
 
         // preload apps
         // FIXME: this is to prevent a QEMU bug on calling bios_sdread()
-        preload_apps();
+        // preload_apps();
         logging(LOG_INFO, "init", "APPs preloaded.\n");
 
         // Init Process Control Blocks |•'-'•) ✧

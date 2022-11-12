@@ -3,7 +3,7 @@
 
 #include <type.h>
 
-#define APP_MEM_BASE     0x52000000
+#define APP_MEM_BASE     0xffffffc052000000
 #define APP_MAXNUM       64
 #define APP_SIZE         0x10000
 

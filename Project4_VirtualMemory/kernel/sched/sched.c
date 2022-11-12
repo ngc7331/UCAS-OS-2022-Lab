@@ -124,8 +124,8 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
         return 0;
     int cid = get_current_cpu_id();
     load_task_img(id, APP, 0);
-    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocKernelPage(1) + PAGE_SIZE;
-    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocUserPage(1) + PAGE_SIZE;
+    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocPage(1) + PAGE_SIZE;
+    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocPage(1) + PAGE_SIZE;
     pcb[pcb_n].pid = ++pid_n;
     pcb[pcb_n].tid = 0;
     pcb[pcb_n].type = TYPE_PROCESS;
