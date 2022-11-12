@@ -151,9 +151,9 @@ extern pcb_t pid0_pcb[2];
 extern const ptr_t pid0_stack[2];
 extern int pcb_n;
 
-// #define S_CORE
+// #define S_CORE_P3
 
-#ifdef S_CORE
+#ifdef S_CORE_P3
 pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else
 pid_t init_pcb(char *name, int argc, char *argv[]);
@@ -167,7 +167,7 @@ void do_block(pcb_t *, list_head *queue);
 void do_unblock(list_node_t *);
 
 /* exec exit kill waitpid ps*/
-#ifdef S_CORE
+#ifdef S_CORE_P3
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else
 pid_t do_exec(char *name, int argc, char *argv[]);

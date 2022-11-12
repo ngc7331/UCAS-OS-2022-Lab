@@ -168,7 +168,7 @@ int main(void) {
             int bg = argv[argc-1][0] == '&' && argv[argc-1][1] == '\0';
             // remove cmd and last '&' from args
             argc -= bg + 1;
-#ifdef S_CORE
+#ifdef S_CORE_P3
             // no arg
             if (!argc) {
                 printf("Error: task id can't be empty\nUsage: exec id [arg0] ... [arg3]\n");
@@ -246,7 +246,7 @@ int main(void) {
             }
         } else if (strcmp("ts", argv[0]) == 0) {
             sys_show_task();
-#ifndef S_CORE
+#ifndef S_CORE_P3
         } else if (strcmp("taskset", argv[0]) == 0) {
             unsigned mask;
             pid_t pid;

@@ -131,11 +131,11 @@ void sys_thread_exit(void *retval) {
     invoke_syscall(SYSCALL_THREAD_EXIT, (long) retval, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
-#ifdef S_CORE
+#ifdef S_CORE_P3
 // S-core
 pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2)
 {
-    /* call invoke_syscall to implement sys_exec for S_CORE */
+    /* call invoke_syscall to implement sys_exec for P3 S_CORE */
     return invoke_syscall(SYSCALL_EXEC, id, argc, arg0, arg1, arg2);
 }
 #else

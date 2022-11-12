@@ -39,7 +39,7 @@ extern void init_shell();
 static void init_pcb_stack(
     ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
     pcb_t *pcb, int argc,
-#ifdef S_CORE
+#ifdef S_CORE_P3
     uint64_t arg0, uint64_t arg1, uint64_t arg2
 #else
     char *argv[]
@@ -62,7 +62,7 @@ static void init_pcb_stack(
     pt_regs->sstatus = SR_SPIE;
     pt_regs->sepc = entry_point;
     pt_regs->regs[10] = argc;
-#ifdef S_CORE
+#ifdef S_CORE_P3
     pt_regs->regs[11] = arg0;
     pt_regs->regs[12] = arg1;
     pt_regs->regs[13] = arg2;
@@ -114,7 +114,7 @@ pcb_t *pcb_dequeue(list_node_t *queue, unsigned cid) {
     return NULL;
 }
 
-#ifdef S_CORE
+#ifdef S_CORE_P3
 pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
 #else
 pid_t init_pcb(char *name, int argc, char *argv[]) {
@@ -141,7 +141,7 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     logging(LOG_DEBUG, "init", "...entrypoint=%x\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
-#ifdef S_CORE
+#ifdef S_CORE_P3
     arg0, arg1, arg2
 #else
     argv
@@ -219,7 +219,7 @@ void do_unblock(list_head *queue) {
     pcb_enqueue(&ready_queue, pcb);
 }
 
-#ifdef S_CORE
+#ifdef S_CORE_P3
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
     int cid = get_current_cpu_id();
     logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n",

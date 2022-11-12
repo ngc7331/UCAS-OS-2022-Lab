@@ -42,10 +42,10 @@ void sys_thread_exit(void *retval);
 void sys_ps(void);
 int sys_getchar(void);
 
-// #define S_CORE
+// #define S_CORE_P3
 
 /* exec */
-#ifdef S_CORE
+#ifdef S_CORE_P3
 // S-core
 pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
 #else

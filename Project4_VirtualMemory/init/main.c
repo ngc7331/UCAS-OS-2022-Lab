@@ -155,7 +155,7 @@ static void init_syscall(void) {
 }
 
 void init_shell(void) {
-#ifdef S_CORE
+#ifdef S_CORE_P3
     init_pcb(0, 0, 0, 0, 0);
 #else
     init_pcb("shell", 0, NULL);
