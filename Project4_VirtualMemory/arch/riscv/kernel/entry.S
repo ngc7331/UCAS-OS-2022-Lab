@@ -46,13 +46,13 @@
   sd   t0, OFFSET_REG_SP(sp)
 
   /*
-   * Disable user-mode memory access as it should only be set in the
-   * actual user copy routines.
+   * FIXME: Disable user-mode memory access as it should only be set in the
+   * actual user copy routines ?
    *
    * Disable the FPU to detect illegal usage of floating point in kernel
    * space.
    */
-  li   t0, SR_SUM | SR_FS
+  li   t0, SR_FS
   csrc CSR_SSTATUS, t0
 
   // save sstatus, sepc, stval and scause on kernel stack
@@ -101,7 +101,7 @@
   ld   s10, OFFSET_REG_S10(sp)
   ld   s11, OFFSET_REG_S11(sp)
 
-  // load sepc, sstatuc from kernel stack
+  // load sepc, sstatus from kernel stack
   ld   t0, OFFSET_REG_SEPC(sp)
   csrw CSR_SEPC, t0
   ld   t0, OFFSET_REG_SSTATUS(sp)

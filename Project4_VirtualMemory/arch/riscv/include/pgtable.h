@@ -71,6 +71,7 @@ static inline void set_satp(
 #define VA_MASK ((1lu << 39) - 1)
 
 #define PPN_BITS 9lu
+#define VPN_MASK ((1lu << PPN_BITS) - 1)
 #define NUM_PTE_ENTRY (1 << PPN_BITS)
 
 #define KVA_PREFIX 0xFFFFFFC000000000UL
@@ -120,7 +121,7 @@ static inline void set_attribute(PTE *entry, uint64_t bits)
 static inline void clear_pgdir(uintptr_t pgdir_addr)
 {
     PTE *p = (PTE *) pgdir_addr;
-    for (int i=0; i<512; i++)
+    for (int i=0; i<NUM_PTE_ENTRY; i++)
         *p++ = 0;
 }
 
@@ -135,5 +136,16 @@ static inline uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va)
     // TODO: [P4-task1] (todo if you need)
 }
 
+static inline uint64_t getvpn2(uint64_t va) {
+    return va >> (NORMAL_PAGE_SHIFT + PPN_BITS + PPN_BITS);
+}
+
+static inline uint64_t getvpn1(uint64_t va) {
+    return (va >> (NORMAL_PAGE_SHIFT + PPN_BITS)) & VPN_MASK;
+}
+
+static inline uint64_t getvpn0(uint64_t va) {
+    return (va >> NORMAL_PAGE_SHIFT) & VPN_MASK;
+}
 
 #endif  // PGTABLE_H

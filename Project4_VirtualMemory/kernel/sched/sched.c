@@ -59,7 +59,7 @@ static void init_pcb_stack(
         pt_regs->regs[i] = 0;
     pt_regs->sbadaddr = 0;
     pt_regs->scause = 0;
-    pt_regs->sstatus = SR_SPIE;
+    pt_regs->sstatus = SR_SPIE | SR_SUM;
     pt_regs->sepc = entry_point;
     pt_regs->regs[10] = argc;
 #ifdef S_CORE_P3
@@ -91,7 +91,7 @@ static void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = (reg_t) user_sp;
-    logging(LOG_DEBUG, "init", "...kernel_sp=%x, user_sp=%x\n", pcb->kernel_sp, pcb->user_sp);
+    logging(LOG_DEBUG, "init", "...kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -122,26 +122,44 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
 #endif
     if (id < 0 || id >= appnum)
         return 0;
+
     int cid = get_current_cpu_id();
-    // FIXME: load task
-    // uint64_t addr = alloc_page_helper(apps[id].entrypoint, );
-    load_task_img(id, APP, 0);
-    // FIXME: stack space?
+
+    // allocate a new pgdir and copy from kernel
+    pcb[pcb_n].pgdir = allocPage(1);
+    share_pgtable(pcb[pcb_n].pgdir, pid0_pcb[cid].pgdir);
+
+    // allocate a new page and load task to it
+    uintptr_t page = alloc_page_helper(apps[id].entrypoint, pcb[pcb_n].pgdir);
+    load_img(page, apps[id].phyaddr, apps[id].size, 1);
+
+    // allocate a new page for kernel stack, set user stack
     pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocPage(1) + PAGE_SIZE;
-    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocPage(1) + PAGE_SIZE;
+    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = USER_STACK_ADDR;
+
+    // identifier
     pcb[pcb_n].pid = ++pid_n;
     pcb[pcb_n].tid = 0;
     pcb[pcb_n].type = TYPE_PROCESS;
     strcpy(pcb[pcb_n].name, apps[id].name);
+
+    // cpu
     pcb[pcb_n].cid = 0;
     pcb[pcb_n].mask = current_running[cid]->mask;
+
+    // screen
     pcb[pcb_n].cursor_x = pcb[pcb_n].cursor_y = 0;
+
+    // status
     pcb[pcb_n].status = TASK_READY;
+
+    // FIXME: pthread
     pcb[pcb_n].retval = NULL;
     pcb[pcb_n].joined = NULL;
 
     logging(LOG_INFO, "init", "load %s as pid=%d\n", pcb[pcb_n].name, pcb[pcb_n].pid);
-    logging(LOG_DEBUG, "init", "...entrypoint=%x\n", apps[id].entrypoint);
+    logging(LOG_DEBUG, "init", "...pgdir=0x%x%x, page=0x%x%x\n", pcb[pcb_n].pgdir >> 32, pcb[pcb_n].pgdir, page >> 32, page);
+    logging(LOG_DEBUG, "init", "...entrypoint=0x%lx\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
 #ifdef S_CORE_P3
@@ -174,6 +192,7 @@ void do_scheduler(void) {
     }
 
     logging(LOG_VERBOSE, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
+    logging(LOG_VERBOSE, "scheduler", "...pgdir=%x%x\n", next->pgdir >> 32, next->pgdir);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;
@@ -186,6 +205,10 @@ void do_scheduler(void) {
     // Modify the current_running pointer.
     process_id = prev->pid;
     current_running[cid] = next;
+
+    // switch pagedir
+    set_satp(SATP_MODE_SV39, next->pid, kva2pa(next->pgdir) >> NORMAL_PAGE_SHIFT);
+    local_flush_tlb_all();
 
     // switch_to current_running
     switch_to(prev, current_running[cid]);

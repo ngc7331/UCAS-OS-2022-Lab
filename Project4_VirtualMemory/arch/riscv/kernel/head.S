@@ -13,6 +13,10 @@ ENTRY(_start)
   csrw CSR_SIE, zero
   csrw CSR_SIP, zero
 
+  /* set sstatus.SUM */
+  li   t0, SR_SUM
+  csrs CSR_SSTATUS, t0
+
   /* read coreid */
   csrr t2, CSR_MHARTID
   bne  t2, zero, secondary
