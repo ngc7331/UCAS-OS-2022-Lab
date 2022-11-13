@@ -4,23 +4,28 @@
 
 #define SECTOR_SIZE 512
 
-uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, unsigned int size, int copy) {
+uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size, int copy) {
 
-    unsigned int block_id = phyaddr / SECTOR_SIZE;
+    uint64_t block_id = phyaddr / SECTOR_SIZE;
 
     // the first byte's offset in the first block
-    unsigned int offset = phyaddr % SECTOR_SIZE;
+    uint64_t offset = phyaddr % SECTOR_SIZE;
 
     /* load how many sectors
      * (size+offset) / SECTOR_SIZE are sectors which only contain the task and the head sector
      * if the remaining != 0 -> there's a tail sector
      */
-    unsigned int num_of_blocks = ((size + offset) / SECTOR_SIZE)
+    int num_of_blocks = ((size + offset) / SECTOR_SIZE)
                       + ((size + offset) % SECTOR_SIZE ? 1 : 0);
 
     // load
-    if (bios_sdread(memaddr, num_of_blocks, block_id) != 0) {
-        return 0;
+    while (num_of_blocks > 0) {
+        if (bios_sdread(memaddr, num_of_blocks > 64 ? 64 : num_of_blocks, block_id) != 0) {
+            return 0;
+        }
+        num_of_blocks -= 64;
+        memaddr += 64 * SECTOR_SIZE;
+        block_id += 64;
     }
 
     if (copy) {
@@ -40,6 +45,7 @@ uint64_t load_task_img(int taskid, task_type_t type, int overwrite) {
     // load task via taskid, which is converted by kernel
     int is_app = type == APP;
     task_info_t *task = is_app ? &apps[taskid] : &batchs[taskid];
+    // FIXME: memaddr should be allocated by kernel and use kvaddr
     uint64_t memaddr = is_app ? task->entrypoint : BATCH_MEM_BASE;
 
     // FIXME: batches?
