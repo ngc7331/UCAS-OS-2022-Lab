@@ -28,6 +28,8 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size, int copy) {
         block_id += 64;
     }
 
+    memaddr -= 64 * SECTOR_SIZE;
+
     if (copy) {
         // copy data from (mem_addr + offset) to (mem_addr)
         uint8_t *src = (uint8_t *) (memaddr + offset);
