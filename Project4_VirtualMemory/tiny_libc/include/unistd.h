@@ -42,7 +42,7 @@ void sys_thread_exit(void *retval);
 void sys_ps(void);
 int sys_getchar(void);
 
-// #define S_CORE_P3
+#define S_CORE_P3
 
 /* exec */
 #ifdef S_CORE_P3

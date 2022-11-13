@@ -15,8 +15,8 @@
 
 pcb_t pcb[NUM_MAX_TASK];
 const ptr_t pid0_stack[2] = {
+    INIT_KERNEL_STACK + PAGE_SIZE,
     INIT_KERNEL_STACK + 2 * PAGE_SIZE,
-    INIT_KERNEL_STACK + 3 * PAGE_SIZE,
 };
 pcb_t pid0_pcb[2];
 
@@ -123,7 +123,10 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     if (id < 0 || id >= appnum)
         return 0;
     int cid = get_current_cpu_id();
+    // FIXME: load task
+    // uint64_t addr = alloc_page_helper(apps[id].entrypoint, );
     load_task_img(id, APP, 0);
+    // FIXME: stack space?
     pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocPage(1) + PAGE_SIZE;
     pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = allocPage(1) + PAGE_SIZE;
     pcb[pcb_n].pid = ++pid_n;
@@ -162,6 +165,7 @@ void do_scheduler(void) {
     pcb_t *prev = current_running[cid];
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);
     if (next == NULL) {
+        logging(LOG_VERBOSE, "scheduler", "no task ready\n");
         if (pid0_pcb[0].status == TASK_READY)
             next = &pid0_pcb[0];
         else if (pid0_pcb[1].status == TASK_READY)

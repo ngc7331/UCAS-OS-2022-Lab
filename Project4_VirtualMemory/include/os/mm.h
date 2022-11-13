@@ -44,7 +44,7 @@ extern ptr_t allocPage(int numPage);
 // TODO [P4-task1] */
 void freePage(ptr_t baseAddr);
 
-// #define S_CORE
+#define S_CORE
 // NOTE: only need for S-core to alloc 2MB large page
 #ifdef S_CORE
 #define LARGE_PAGE_FREEMEM 0xffffffc056000000

@@ -28,6 +28,16 @@ short appnum;
 task_info_t batchs[BATCH_MAXNUM];
 short batchnum;
 
+static void unmap_boot_addr(void) {
+    PTE *pgdir = (PTE *)pa2kva(PGDIR_PA);
+    for (uint64_t pa = 0x50000000lu; pa < 0x50400000lu;
+         pa += 0x200000lu) {
+        uint64_t vpn2 = (pa & VA_MASK) >> (NORMAL_PAGE_SHIFT + PPN_BITS + PPN_BITS);
+        pgdir[vpn2] = 0;
+    }
+    local_flush_tlb_all();
+}
+
 static void init_jmptab(void) {
     volatile long (*(*jmptab))() = (volatile long (*(*))())KERNEL_JMPTAB_BASE;
 
@@ -71,13 +81,16 @@ static void init_task_info(void) {
 static void init_pcb0(void) {
     int cid = get_current_cpu_id();
     // set sp
-    pid0_pcb[cid].kernel_sp = pid0_pcb[cid].kernel_stack_base = pid0_stack[cid];
-    pid0_pcb[cid].user_sp = pid0_pcb[cid].user_stack_base = pid0_stack[cid];
+    pid0_pcb[cid].kernel_sp = pid0_pcb[cid].kernel_stack_base = pid0_stack[cid] + 2 * PAGE_SIZE;
     pid0_pcb[cid].kernel_sp -= sizeof(regs_context_t);
+    // user_sp will be saved by switch_to()
 
     // init list
     list_init(&pid0_pcb[cid].list);
     list_init(&pid0_pcb[cid].wait_list);
+
+    // set pagedir
+    pid0_pcb[cid].pgdir = pa2kva(PGDIR_PA);
 
     // set identifier
     pid0_pcb[cid].pid = pid0_pcb[cid].tid = 0;
@@ -172,11 +185,15 @@ int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
         // set log level
-        set_loglevel(LOG_DEBUG);
+        set_loglevel(LOG_VERBOSE);
 
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
         logging(LOG_INFO, "init", "Jump table initialization succeeded.\n");
+
+        // upmap boot address
+        unmap_boot_addr();
+        logging(LOG_INFO, "init", "Unmapped boot address[0x50000000, 0x54000000)\n");
 
         // Init task information (〃'▽'〃)
         init_task_info();
