@@ -64,6 +64,7 @@ static inline void set_satp(
 #define _PAGE_SOFT (1 << 8)     /* Reserved for software */
 
 #define _PAGE_PFN_SHIFT 10lu
+#define _PAGE_CTRL_MASK ((1lu << _PAGE_PFN_SHIFT) - 1)
 #define _PAGE_PPN_LEN 44lu
 #define _PAGE_PPN_MASK ((1lu << _PAGE_PPN_LEN) - 1)
 
@@ -101,6 +102,7 @@ static inline long get_pfn(PTE entry)
 }
 static inline void set_pfn(PTE *entry, uint64_t pfn)
 {
+    *entry &= ~(_PAGE_PPN_MASK << _PAGE_PFN_SHIFT);
     *entry |= (pfn & _PAGE_PPN_MASK) << _PAGE_PFN_SHIFT;
 }
 
@@ -111,7 +113,8 @@ static inline long get_attribute(PTE entry, uint64_t mask)
 }
 static inline void set_attribute(PTE *entry, uint64_t bits)
 {
-    *entry |= bits;
+    *entry &= ~_PAGE_CTRL_MASK;
+    *entry |= bits & _PAGE_CTRL_MASK;
 }
 
 static inline void clear_pgdir(uintptr_t pgdir_addr)
