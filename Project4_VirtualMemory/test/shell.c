@@ -161,7 +161,10 @@ int main(void) {
 
         // commands
         if (strcmp("ps", argv[0]) == 0) {
-            sys_ps();
+            int mode = 0;
+            if (argc >= 2 && strcmp("-v", argv[1]) == 0)
+                mode = 1;
+            sys_ps(mode);
         } else if (strcmp("clear", argv[0]) == 0) {
             init_shell();
         } else if (strcmp("exec", argv[0]) == 0) {

@@ -39,7 +39,7 @@ void sys_thread_join(pid_t tid, void **retval);
 void sys_thread_exit(void *retval);
 
 /* ps, getchar */
-void sys_ps(void);
+void sys_ps(int mode);
 int sys_getchar(void);
 
 #define S_CORE_P3

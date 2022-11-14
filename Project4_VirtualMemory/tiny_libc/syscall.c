@@ -165,10 +165,10 @@ int sys_waitpid(pid_t pid)
     return invoke_syscall(SYSCALL_WAITPID, pid, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
-void sys_ps(void)
+void sys_ps(int mode)
 {
     /* call invoke_syscall to implement sys_ps */
-    invoke_syscall(SYSCALL_PS, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+    invoke_syscall(SYSCALL_PS, mode, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
 pid_t sys_getpid()

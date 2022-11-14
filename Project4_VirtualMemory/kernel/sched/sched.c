@@ -193,16 +193,22 @@ void do_scheduler(void) {
     pcb_t *prev = current_running[cid];
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);
     if (next == NULL) {
-        logging(LOG_VERBOSE, "scheduler", "no task ready\n");
-        if (pid0_pcb[0].status == TASK_READY)
+        if (current_running[cid]->status == TASK_RUNNING) {
+            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, back to %d.%s.%d\n", prev->pid, prev->name, prev->tid);
+            return ;
+        } else if (pid0_pcb[0].status == TASK_READY) {
+            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, use 0.init.0\n");
             next = &pid0_pcb[0];
-        else if (pid0_pcb[1].status == TASK_READY)
+        } else if (pid0_pcb[1].status == TASK_READY) {
+            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, use 0.init.1\n");
             next = &pid0_pcb[1];
-        else return ;
+        } else{
+            logging(LOG_CRITICAL, "scheduler", "ready_queue empty, kernel not ready yet\n");
+            assert(0);
+        }
     }
 
     logging(LOG_VERBOSE, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
-    logging(LOG_VERBOSE, "scheduler", "... pgdir=%x%x\n", next->pgdir >> 32, next->pgdir);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;
@@ -296,7 +302,7 @@ int do_kill(pid_t pid) {
             }
             // forced release all locks, this will do nothing if proc doesnt hold any lock
             do_mutex_lock_release_f(pcb[i].pid);
-            // FIXME: barrier?
+            // barrier & mbox will not be released by kernel
             // do kill
             pcb[i].status = TASK_EXITED;
             // remove pcb from any queue, this will do nothing if pcb is not in a queue
@@ -333,7 +339,7 @@ int do_waitpid(pid_t pid) {
     return retval;
 }
 
-void do_process_show(void) {
+void do_process_show(int mode) {
     char *status_dict[] = {
         "BLOCK  ",
         "RUNNING",
@@ -343,6 +349,8 @@ void do_process_show(void) {
     printk("--------------------- PROCESS TABLE START ---------------------\n");
     printk("| idx | PID | TID | name             | status  | cpu |  mask  |\n");
     for (int i=0; i<pcb_n; i++) {
+        if (mode == 0 && pcb[i].status == TASK_EXITED)
+            continue;
         char buf[17] = "                ";
         // collapse name longer than 15
         int len = strlen(pcb[i].name);
