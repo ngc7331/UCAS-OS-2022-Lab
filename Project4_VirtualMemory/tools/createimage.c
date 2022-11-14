@@ -30,9 +30,10 @@ typedef enum {
 typedef struct {
     char name[32];
     task_type_t type;
-    int size;
-    int phyaddr;
+    uint64_t size;
+    uint64_t phyaddr;
     uint64_t entrypoint;
+    uint64_t memsize;
     int execute_on_load;
     int loaded;
 } task_info_t;
@@ -55,7 +56,7 @@ static void read_ehdr(Elf64_Ehdr *ehdr, FILE *fp);
 static void read_phdr(Elf64_Phdr *phdr, FILE *fp, int ph, Elf64_Ehdr ehdr);
 static uint64_t get_entrypoint(Elf64_Ehdr ehdr);
 static uint32_t get_filesz(Elf64_Phdr phdr);
-// static uint32_t get_memsz(Elf64_Phdr phdr);
+static uint32_t get_memsz(Elf64_Phdr phdr);
 static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr);
 static void write_padding(FILE *img, int *phyaddr, int new_phyaddr);
 static void write_batch_file(FILE *img, FILE *batch);
@@ -131,6 +132,7 @@ static void create_image(int nfiles, char *files[]) {
         task.execute_on_load = 0;
         task.entrypoint = get_entrypoint(ehdr);
         task.phyaddr = phyaddr;
+        task.memsize = 0;
 
         // for each program header
         for (int ph = 0; ph < ehdr.e_phnum; ph++) {
@@ -145,6 +147,9 @@ static void create_image(int nfiles, char *files[]) {
             if (strcmp(*files, "main") == 0) {
                 nbytes_kernel += get_filesz(phdr);
             }
+
+            // record memsize
+            task.memsize += get_memsz(phdr);
         }
 
         // padding bootblock
@@ -186,7 +191,7 @@ static void create_image(int nfiles, char *files[]) {
         // write batch file into img
         write_batch_file(img, batch);
         // size is the (current position of STREAM *batch) - 2
-        task.size = ftell(batch) - 2;
+        task.memsize = task.size = ftell(batch) - 2;
 
         taskinfo[tasknum++] = task;
 
@@ -235,9 +240,9 @@ static uint32_t get_filesz(Elf64_Phdr phdr) {
     return phdr.p_filesz;
 }
 
-// static uint32_t get_memsz(Elf64_Phdr phdr) {
-//     return phdr.p_memsz;
-// }
+static uint32_t get_memsz(Elf64_Phdr phdr) {
+    return phdr.p_memsz;
+}
 
 static void write_segment(Elf64_Phdr phdr, FILE *fp, FILE *img, int *phyaddr) {
     if (phdr.p_memsz != 0 && phdr.p_type == PT_LOAD) {

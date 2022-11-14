@@ -61,7 +61,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
     uint64_t vpn0 = getvpn0(va);
 
     logging(LOG_INFO, "mm", "allocate page for addr %x%x in pgtable at %x%x\n", va>>32, va, pgdir>>32, pgdir);
-    logging(LOG_DEBUG, "mm", "... vpn2=%x, vpn1=%x, vpn0=%x\n", vpn2, vpn1, vpn0);
+    logging(LOG_VERBOSE, "mm", "... vpn2=%x, vpn1=%x, vpn0=%x\n", vpn2, vpn1, vpn0);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
@@ -75,7 +75,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
         pt1 = pa2kva(get_pa(pt2[vpn2]));
     }
 
-    logging(LOG_DEBUG, "mm", "... level-1 pgtable at %x%x\n", (uint64_t) pt1 >> 32, (uint64_t)pt1);
+    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at %x%x\n", (uint64_t) pt1 >> 32, (uint64_t)pt1);
 
 #ifdef S_CORE
     // find pte
@@ -93,15 +93,15 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
         pt0 = pa2kva(get_pa(pt1[vpn1]));
     }
 
-    logging(LOG_DEBUG, "mm", "... level-0 pgtable at %x%x\n", (uint64_t) pt1 >> 32, (uint64_t)pt1);
+    logging(LOG_VERBOSE, "mm", "... level-0 pgtable at %x%x\n", (uint64_t) pt0 >> 32, (uint64_t)pt0);
 
     // find pte
     PTE *pte = &pt0[vpn0];
 #endif
 
-    logging(LOG_DEBUG, "mm", "... pte at %x%x\n", (uint64_t) pte >> 32, (uint64_t)pte);
+    logging(LOG_VERBOSE, "mm", "... pte at %x%x\n", (uint64_t) pte >> 32, (uint64_t)pte);
 
-    // conflict
+    // FIXME: conflict?
     if (*pte & _PAGE_PRESENT) {
         logging(LOG_ERROR, "mm", "va %lx already in pgdir %lx\n", va, pgdir);
         return 0;
@@ -120,7 +120,6 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
     set_pfn(pte, kva2pa(page) >> NORMAL_PAGE_SHIFT);
     set_attribute(pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE |
                              _PAGE_EXEC | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_USER);
-    logging(LOG_CRITICAL, "test", "%x\n", get_pa(pte));
 
     return page;
 }

@@ -66,7 +66,7 @@ static void init_pcb_stack(
     pt_regs->regs[11] = arg0;
     pt_regs->regs[12] = arg1;
     pt_regs->regs[13] = arg2;
-    logging(LOG_DEBUG, "init", "...arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
+    logging(LOG_DEBUG, "init", "... arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
 #else
     char **pt_argv = (char **) (user_stack - (argc + 1) * 8);
     user_sp = (char *) pt_argv;
@@ -74,7 +74,7 @@ static void init_pcb_stack(
         user_sp -= strlen(argv[i]) + 1;
         strcpy(user_sp, argv[i]);
         pt_argv[i] = user_sp;
-        logging(LOG_DEBUG, "init", "...argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
+        logging(LOG_DEBUG, "init", "... argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
     }
     pt_argv[argc] = NULL;
     pt_regs->regs[11] = (reg_t) pt_argv;
@@ -91,7 +91,7 @@ static void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = (reg_t) user_sp;
-    logging(LOG_DEBUG, "init", "...kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
+    logging(LOG_DEBUG, "init", "... kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -129,12 +129,22 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     pcb[pcb_n].pgdir = allocPage(1);
     share_pgtable(pcb[pcb_n].pgdir, pid0_pcb[cid].pgdir);
 
-    // allocate a new page and load task to it
+    // allocate new pages and load task to it
+    // if S_CORE, alloc a large page; else, alloc first normal page
     uintptr_t page = alloc_page_helper(apps[id].entrypoint, pcb[pcb_n].pgdir);
+#ifndef S_CORE
+    // and alloc remaining normal pages
+    for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
+        alloc_page_helper(apps[id].entrypoint + i, pcb[pcb_n].pgdir);
+    }
+#endif
     load_img(page, apps[id].phyaddr, apps[id].size, 1);
 
     // allocate a new page for kernel stack, set user stack
     pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocPage(1) + PAGE_SIZE;
+#ifndef S_CORE
+    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, pcb[pcb_n].pgdir) + PAGE_SIZE;
+#endif
     pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = USER_STACK_ADDR;
 
     // identifier
@@ -158,8 +168,8 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
     pcb[pcb_n].joined = NULL;
 
     logging(LOG_INFO, "init", "load %s as pid=%d\n", pcb[pcb_n].name, pcb[pcb_n].pid);
-    logging(LOG_DEBUG, "init", "...pgdir=0x%x%x, page=0x%x%x\n", pcb[pcb_n].pgdir >> 32, pcb[pcb_n].pgdir, page >> 32, page);
-    logging(LOG_DEBUG, "init", "...entrypoint=0x%lx\n", apps[id].entrypoint);
+    logging(LOG_DEBUG, "init", "... pgdir=0x%x%x, page=0x%x%x\n", pcb[pcb_n].pgdir >> 32, pcb[pcb_n].pgdir, page >> 32, page);
+    logging(LOG_DEBUG, "init", "... entrypoint=0x%lx\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
 #ifdef S_CORE_P3
@@ -192,7 +202,7 @@ void do_scheduler(void) {
     }
 
     logging(LOG_VERBOSE, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
-    logging(LOG_VERBOSE, "scheduler", "...pgdir=%x%x\n", next->pgdir >> 32, next->pgdir);
+    logging(LOG_VERBOSE, "scheduler", "... pgdir=%x%x\n", next->pgdir >> 32, next->pgdir);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;

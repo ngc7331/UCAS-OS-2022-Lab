@@ -20,9 +20,10 @@ typedef enum {
 typedef struct {
     char name[32];
     task_type_t type;
-    int size;
-    int phyaddr;
+    uint64_t size;
+    uint64_t phyaddr;
     uint64_t entrypoint;
+    uint64_t memsize;
     int execute_on_load;
     int loaded;
 } task_info_t;

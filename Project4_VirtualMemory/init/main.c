@@ -118,7 +118,7 @@ static void init_pcb0(void) {
 
 static void invalid_syscall(long arg0, long arg1, long arg2, long arg3, long arg4) {
     logging(LOG_CRITICAL, "init", "invalid syscall\n");
-    logging(LOG_CRITICAL, "init", "...args[]=%ld %ld %ld %ld %ld\n", arg0, arg1, arg2, arg3, arg4);
+    logging(LOG_CRITICAL, "init", "... args[]=%ld %ld %ld %ld %ld\n", arg0, arg1, arg2, arg3, arg4);
     printk("invalid syscall\n");
     assert(0);
 }
@@ -185,7 +185,7 @@ int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
         // set log level
-        set_loglevel(LOG_VERBOSE);
+        set_loglevel(LOG_DEBUG);
 
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
