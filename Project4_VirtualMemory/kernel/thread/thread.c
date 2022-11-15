@@ -8,7 +8,6 @@
 #include <printk.h>
 
 extern void ret_from_exception();
-extern int pcb_n;
 extern void pcb_enqueue(list_node_t *queue, pcb_t *pcb);
 
 static void init_pcb_stack(
@@ -54,7 +53,9 @@ static int newtid() {
     if (current_running[cid]->type == TYPE_PROCESS) {
         return current_running[cid]->tid++;
     }
-    for (int i=0; i<=pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (pcb[i].pid == current_running[cid]->pid && pcb[i].type == TYPE_PROCESS)
             return pcb[i].tid++;
     }
@@ -84,8 +85,9 @@ pid_t thread_create(uint64_t entrypoint, void *arg) {
     logging(LOG_DEBUG, "thread", "...entrypoint=%ld, arg=%ld\n", entrypoint, (uint64_t) arg);
 
     // disable_preempt();
-    pcb[pcb_n] = new;
-    pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
+    // FIXME:
+    // pcb[pcb_n] = new;
+    // pcb_enqueue(&ready_queue, &pcb[pcb_n++]);
     // enable_preempt();
     return new.tid;
 }
@@ -94,7 +96,9 @@ void thread_join(pid_t tid, void **retval) {
     int cid = get_current_cpu_id();
     // find sub by tid
     pcb_t *sub = NULL;
-    for (int i=0; i<pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (pcb[i].pid == current_running[cid]->pid && pcb[i].type == TYPE_THREAD && pcb[i].tid == tid)
             sub = &pcb[i];
     }

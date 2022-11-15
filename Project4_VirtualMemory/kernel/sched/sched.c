@@ -22,7 +22,6 @@ pcb_t pid0_pcb[2];
 
 // last allocated pid
 int pid_n = 0;
-int pcb_n = 0;
 
 LIST_HEAD(ready_queue);
 LIST_HEAD(sleep_queue);
@@ -35,6 +34,11 @@ pid_t process_id = 1;
 
 extern void ret_from_exception();
 extern void init_shell();
+
+void init_pcbs(void) {
+    for (int i=0; i<NUM_MAX_TASK; i++)
+        pcb[i].status = TASK_UNUSED;
+}
 
 static void init_pcb_stack(
     ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
@@ -66,7 +70,7 @@ static void init_pcb_stack(
     pt_regs->regs[11] = arg0;
     pt_regs->regs[12] = arg1;
     pt_regs->regs[13] = arg2;
-    logging(LOG_DEBUG, "init", "... arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
+    logging(LOG_DEBUG, "scheduler", "... arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
 #else
     char **pt_argv = (char **) (user_stack - (argc + 1) * 8);
     user_sp = (char *) pt_argv;
@@ -74,7 +78,7 @@ static void init_pcb_stack(
         user_sp -= strlen(argv[i]) + 1;
         strcpy(user_sp, argv[i]);
         pt_argv[i] = user_sp;
-        logging(LOG_DEBUG, "init", "... argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
+        logging(LOG_DEBUG, "scheduler", "... argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
     }
     pt_argv[argc] = NULL;
     pt_regs->regs[11] = (reg_t) pt_argv;
@@ -91,7 +95,7 @@ static void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = (reg_t) user_sp;
-    logging(LOG_DEBUG, "init", "... kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
+    logging(LOG_DEBUG, "scheduler", "... kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -114,89 +118,102 @@ pcb_t *pcb_dequeue(list_node_t *queue, unsigned cid) {
     return NULL;
 }
 
+static int new_pcb_idx() {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED || pcb[i].status == TASK_EXITED)
+            return i;
+    }
+    return -1;
+}
+
 #ifdef S_CORE_P3
 pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
-#else
-pid_t do_exec(char *name, int argc, char *argv[]) {
-    int id = get_taskid_by_name(name, APP);
-#endif
-    if (id < 0 || id >= appnum)
-        return 0;
-
     int cid = get_current_cpu_id();
-
-#ifdef S_CORE_P3
     logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n",
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, id, argc, arg0, arg1, arg2);
 #else
+pid_t do_exec(char *name, int argc, char *argv[]) {
+    int cid = get_current_cpu_id();
+    int id = get_taskid_by_name(name, APP);
     logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n",
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, name, argc, argv);
 #endif
+    if (id < 0 || id >= appnum) {
+        logging(LOG_ERROR, "scheduler", "invalid name / id\n");
+        return 0;
+    }
+
+    // get new idx
+    int idx = new_pcb_idx();
+    if (idx < 0 || idx >= NUM_MAX_TASK) {
+        logging(LOG_ERROR, "scheduler", "max task num exceeded\n");
+        return 0;
+    }
 
     // init page_list
-    list_init(&pcb[pcb_n].page_list);
+    list_init(&pcb[idx].page_list);
 
     // allocate a new pgdir and copy from kernel
     page_t *tmp = alloc_page1();
-    list_insert(&pcb[pcb_n].page_list, &tmp->list);
-    pcb[pcb_n].pgdir = tmp->kva;
-    share_pgtable(pcb[pcb_n].pgdir, pid0_pcb[cid].pgdir);
+    list_insert(&pcb[idx].page_list, &tmp->list);
+    pcb[idx].pgdir = tmp->kva;
+    share_pgtable(pcb[idx].pgdir, pid0_pcb[cid].pgdir);
 
     // allocate new pages and load task to it
     // if S_CORE, alloc a large page; else, alloc first normal page
-    uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[pcb_n]);
+    uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[idx]);
 #ifndef S_CORE
     // and alloc remaining normal pages
     for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
-        alloc_page_helper(apps[id].entrypoint + i, &pcb[pcb_n]);
+        alloc_page_helper(apps[id].entrypoint + i, &pcb[idx]);
     }
 #endif
     load_img(page, apps[id].phyaddr, apps[id].size, 1);
 
     // allocate a new page for kernel stack, set user stack
     tmp = alloc_page1();
-    list_insert(&pcb[pcb_n].page_list, &tmp->list);
-    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = tmp->kva + PAGE_SIZE;
+    list_insert(&pcb[idx].page_list, &tmp->list);
+    pcb[idx].kernel_sp = pcb[idx].kernel_stack_base = tmp->kva + PAGE_SIZE;
 #ifndef S_CORE
-    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, &pcb[pcb_n]) + PAGE_SIZE;
+    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, &pcb[idx]) + PAGE_SIZE;
 #endif
-    pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = USER_STACK_ADDR;
+    pcb[idx].user_sp = pcb[idx].user_stack_base = USER_STACK_ADDR;
 
     // identifier
-    pcb[pcb_n].pid = ++pid_n;
-    pcb[pcb_n].tid = 0;
-    pcb[pcb_n].type = TYPE_PROCESS;
-    strcpy(pcb[pcb_n].name, apps[id].name);
+    pcb[idx].pid = ++pid_n;
+    pcb[idx].tid = 0;
+    pcb[idx].type = TYPE_PROCESS;
+    strcpy(pcb[idx].name, apps[id].name);
 
     // cpu
-    pcb[pcb_n].cid = 0;
-    pcb[pcb_n].mask = current_running[cid]->mask;
+    pcb[idx].cid = 0;
+    pcb[idx].mask = current_running[cid]->mask;
 
     // screen
-    pcb[pcb_n].cursor_x = pcb[pcb_n].cursor_y = 0;
+    pcb[idx].cursor_x = pcb[idx].cursor_y = 0;
 
     // status
-    pcb[pcb_n].status = TASK_READY;
+    pcb[idx].status = TASK_READY;
 
     // FIXME: pthread
-    pcb[pcb_n].retval = NULL;
-    pcb[pcb_n].joined = NULL;
+    pcb[idx].retval = NULL;
+    pcb[idx].joined = NULL;
 
-    logging(LOG_INFO, "init", "load %s as pid=%d\n", pcb[pcb_n].name, pcb[pcb_n].pid);
-    logging(LOG_DEBUG, "init", "... pgdir=0x%x%x, page=0x%x%x\n", pcb[pcb_n].pgdir >> 32, pcb[pcb_n].pgdir, page >> 32, page);
-    logging(LOG_DEBUG, "init", "... entrypoint=0x%lx\n", apps[id].entrypoint);
+    logging(LOG_INFO, "scheduler", "load %s as pid=%d\n", pcb[idx].name, pcb[idx].pid);
+    logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x, page=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir, page >> 32, page);
+    logging(LOG_DEBUG, "scheduler", "... entrypoint=0x%lx\n", apps[id].entrypoint);
 
-    init_pcb_stack(pcb[pcb_n].kernel_sp, pcb[pcb_n].user_sp, apps[id].entrypoint, &pcb[pcb_n], argc,
+    init_pcb_stack(pcb[idx].kernel_sp, pcb[idx].user_sp, apps[id].entrypoint, &pcb[idx], argc,
 #ifdef S_CORE_P3
-    arg0, arg1, arg2
+                   arg0, arg1, arg2
 #else
-    argv
+                   argv
 #endif
     );
 
-    list_init(&pcb[pcb_n].wait_list);
-    pcb_enqueue(&ready_queue, &pcb[pcb_n]);
-    return pcb[pcb_n++].pid;
+    list_init(&pcb[idx].wait_list);
+    pcb_enqueue(&ready_queue, &pcb[idx]);
+    return pcb[idx].pid;
 }
 
 void do_scheduler(void) {
@@ -293,8 +310,15 @@ int do_kill(pid_t pid) {
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, pid);
     int retval = 0;
     // kill process and its threads
-    for (int i=0; i<pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (pcb[i].pid == pid && pcb[i].status != TASK_EXITED) {
+            // shell is killed, warn and restart
+            if (strcmp("shell", pcb[i].name) == 0) {
+                init_shell();
+                logging(LOG_WARNING, "scheduler", "shell is killed and restarted\n");
+            }
             // wakeup waiting processes
             while (!list_is_empty(&pcb[i].wait_list)) {
                 do_unblock(&pcb[i].wait_list);
@@ -311,11 +335,6 @@ int do_kill(pid_t pid) {
             // log
             logging(LOG_INFO, "scheduler", "%d.%s.%d %s\n",
                     pcb[i].pid, pcb[i].name, pcb[i].tid, pid==current_running[cid]->pid ? "exited" : "is killed");
-            // shell is killed, warn and restart
-            if (strcmp("shell", pcb[i].name) == 0) {
-                init_shell();
-                logging(LOG_WARNING, "scheduler", "shell is killed and restarted\n");
-            }
         }
     }
     // FIXME: garbage collector?
@@ -327,7 +346,9 @@ int do_waitpid(pid_t pid) {
     int retval = 0;
     logging(LOG_INFO, "scheduler", "%d.%s wait %d\n",
             current_running[cid]->pid, current_running[cid]->name, pid);
-    for (int i=0; i<pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (pcb[i].pid == pid && pcb[i].type == TYPE_PROCESS) {
             if (pcb[i].status != TASK_EXITED)
                 do_block(current_running[cid], &pcb[i].wait_list);
@@ -347,7 +368,9 @@ void do_process_show(int mode) {
     };
     printk("--------------------- PROCESS TABLE START ---------------------\n");
     printk("| idx | PID | TID | name             | status  | cpu |  mask  |\n");
-    for (int i=0; i<pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (mode == 0 && pcb[i].status == TASK_EXITED)
             continue;
         char buf[17] = "                ";
@@ -369,7 +392,9 @@ pid_t do_getpid(void) {
 }
 
 void do_taskset(pid_t pid, unsigned mask) {
-    for (int i=0; i<pcb_n; i++) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
         if (pcb[i].pid == pid && pcb[i].status != TASK_EXITED)
             pcb[i].mask = mask;
     }

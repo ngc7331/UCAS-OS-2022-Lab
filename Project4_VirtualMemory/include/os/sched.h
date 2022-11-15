@@ -71,6 +71,7 @@ typedef enum {
     TASK_RUNNING,
     TASK_READY,
     TASK_EXITED,
+    TASK_UNUSED
 } task_status_t;
 
 typedef enum {
@@ -152,9 +153,10 @@ extern pid_t process_id;
 extern pcb_t pcb[NUM_MAX_TASK];
 extern pcb_t pid0_pcb[2];
 extern const ptr_t pid0_stack[2];
-extern int pcb_n;
 
 #define S_CORE_P3
+
+void init_pcbs(void);
 
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);

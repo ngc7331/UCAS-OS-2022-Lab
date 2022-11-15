@@ -78,7 +78,7 @@ static void init_task_info(void) {
     }
 }
 
-static void init_pcb0(void) {
+static void init_pid0_pcb(void) {
     int cid = get_current_cpu_id();
     // set sp
     pid0_pcb[cid].kernel_sp = pid0_pcb[cid].kernel_stack_base = pid0_stack[cid] + 2 * PAGE_SIZE;
@@ -205,8 +205,10 @@ int main(void) {
         // logging(LOG_INFO, "init", "APPs preloaded.\n");
 
         // Init Process Control Blocks |•'-'•) ✧
-        init_pcb0();
-        logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+        init_pcbs();
+        logging(LOG_INFO, "init", "PCB[] initialization succeeded.\n");
+        init_pid0_pcb();
+        logging(LOG_INFO, "init", "PID0_PCB initialization succeeded.\n");
         init_shell();
         logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
@@ -243,8 +245,8 @@ int main(void) {
     } else {
         // for slave core
         // init pcb
-        init_pcb0();
-        logging(LOG_INFO, "init", "PCB0 initialization succeeded.\n");
+        init_pid0_pcb();
+        logging(LOG_INFO, "init", "PID0_PCB initialization succeeded.\n");
 
         // setup exception
         setup_exception();
