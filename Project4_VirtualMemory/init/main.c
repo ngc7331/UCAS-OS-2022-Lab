@@ -202,7 +202,7 @@ int main(void) {
         // preload apps
         // FIXME: this is to prevent a QEMU bug on calling bios_sdread()
         // preload_apps();
-        logging(LOG_INFO, "init", "APPs preloaded.\n");
+        // logging(LOG_INFO, "init", "APPs preloaded.\n");
 
         // Init Process Control Blocks |•'-'•) ✧
         init_pcb0();

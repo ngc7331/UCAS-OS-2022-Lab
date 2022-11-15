@@ -31,15 +31,15 @@ page_t *alloc_page1(void) {
     page_t *page;
     if (!list_is_empty(&freepage_list)) {
         page = list_entry(freepage_list.next, page_t, list);
-        list_delete(&freepage_list.next);
+        list_delete(freepage_list.next);
         page->ref ++;
-        logging(LOG_INFO, "mm", "reuse page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva << 32, page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
         list_init(&page->list);
         page->ref = 1;
-        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva << 32, page->kva);
     }
     return page;
 }
@@ -48,7 +48,7 @@ void free_page1(page_t *page) {
     if (--page->ref <= 0) {
         list_delete(&page->list);
         list_insert(&freepage_list, &page->list);
-        logging(LOG_INFO, "mm", "freed page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva << 32, page->kva);
     }
 }
 
@@ -82,7 +82,7 @@ void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {
     }
 }
 
-/* allocate physical page for `va`, mapping it into `pgdir`,
+/* allocate physical page for `va`, mapping it into `pcb->pgdir`,
    return the kernel virtual address for the page
    */
 uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
@@ -110,7 +110,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         clear_pgdir(page);
         pt1 = (PTE *) page;
     } else {
-        pt1 = pa2kva(get_pa(pt2[vpn2]));
+        pt1 = (PTE *) pa2kva(get_pa(pt2[vpn2]));
     }
 
     logging(LOG_VERBOSE, "mm", "... level-1 pgtable at %x%x\n", (uint64_t) pt1 >> 32, (uint64_t)pt1);
@@ -130,7 +130,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         clear_pgdir(page);
         pt0 = (PTE *) page;
     } else {
-        pt0 = pa2kva(get_pa(pt1[vpn1]));
+        pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
     }
 
     logging(LOG_VERBOSE, "mm", "... level-0 pgtable at %x%x\n", (uint64_t) pt0 >> 32, (uint64_t)pt0);
@@ -169,6 +169,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
 uintptr_t shm_page_get(int key)
 {
     // TODO [P4-task4] shm_page_get:
+    return 0;
 }
 
 void shm_page_dt(uintptr_t addr)

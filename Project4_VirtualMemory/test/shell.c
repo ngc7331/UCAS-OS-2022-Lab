@@ -150,14 +150,14 @@ int main(void) {
         int argc = 0;
         char *argv[BUFSIZE / 2];
         char *pbuf = buf;
-        while (*pbuf) {
+        do {
             while (isspace(*pbuf)) pbuf++;
             // pbuf -> start of an arg
             argv[argc++] = pbuf;
             while (!isspace(*pbuf) && *pbuf) pbuf++;
             // pbuf -> next ch of the end of an arg, should be space or '\0'
             if (*pbuf) *pbuf++ = '\0';
-        }
+        } while (*pbuf);
 
         // commands
         if (strcmp("ps", argv[0]) == 0) {

@@ -75,7 +75,7 @@ int boot_kernel(unsigned long mhartid)
     }
 
     /* go to kernel */
-    ((kernel_entry_t)pa2kva(_start))(mhartid);
+    ((kernel_entry_t)pa2kva((uintptr_t)_start))(mhartid);
 
     return 0;
 }
