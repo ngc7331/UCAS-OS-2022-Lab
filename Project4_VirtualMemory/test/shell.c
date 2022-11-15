@@ -265,7 +265,7 @@ int main(void) {
             printf("Set pid=%d's mask=0x%04x\n", pid, mask);
 #endif
         } else {
-            printf("Command %s not found\n", buf);
+            printf("Command \"%s\" not found\n", buf);
         }
     }
     return 0;

@@ -33,13 +33,13 @@ page_t *alloc_page1(void) {
         page = list_entry(freepage_list.next, page_t, list);
         list_delete(freepage_list.next);
         page->ref ++;
-        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
         list_init(&page->list);
         page->ref = 1;
-        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
     return page;
 }
@@ -48,11 +48,12 @@ void free_page1(page_t *page) {
     if (--page->ref <= 0) {
         list_delete(&page->list);
         list_insert(&freepage_list, &page->list);
-        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva << 32, page->kva);
+        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
     }
 }
 
 void *kmalloc(size_t size) {
+    size = ROUND(size, 4);
     if (size > PAGE_SIZE) {
         logging(LOG_ERROR, "mm", "currently unable to kmalloc mem larger than 4K\n");
         return NULL;
@@ -63,7 +64,7 @@ void *kmalloc(size_t size) {
         // NOTE: this can't be freed
         remaining = PAGE_SIZE;
         p = allocPage(1);
-        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x for kmalloc\n", p<<32, p);
+        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x for kmalloc\n", p>>32, p);
     }
     remaining -= size;
     void *ret = (void *) p;
@@ -107,8 +108,8 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
-    logging(LOG_INFO, "mm", "allocate page for addr %x%x in pgtable at %x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
-    logging(LOG_VERBOSE, "mm", "... vpn2=%x, vpn1=%x, vpn0=%x\n", vpn2, vpn1, vpn0);
+    logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
+    logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
@@ -124,7 +125,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         pt1 = (PTE *) pa2kva(get_pa(pt2[vpn2]));
     }
 
-    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at %x%x\n", (uint64_t) pt1 >> 32, (uint64_t)pt1);
+    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at 0x%x%x\n", (uint64_t)pt1>>32, (uint64_t)pt1);
 
 #ifdef S_CORE
     // find pte
@@ -144,17 +145,17 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
     }
 
-    logging(LOG_VERBOSE, "mm", "... level-0 pgtable at %x%x\n", (uint64_t) pt0 >> 32, (uint64_t)pt0);
+    logging(LOG_VERBOSE, "mm", "... level-0 pgtable at 0x%x%x\n", (uint64_t)pt0>>32, (uint64_t)pt0);
 
     // find pte
     PTE *pte = &pt0[vpn0];
 #endif
 
-    logging(LOG_VERBOSE, "mm", "... pte at %x%x\n", (uint64_t) pte >> 32, (uint64_t)pte);
+    logging(LOG_VERBOSE, "mm", "... pte at 0x%x%x\n", (uint64_t)pte>>32, (uint64_t)pte);
 
     // FIXME: conflict?
     if (*pte & _PAGE_PRESENT) {
-        logging(LOG_ERROR, "mm", "va %lx already in pgdir %lx\n", va, pcb->pgdir);
+        logging(LOG_WARNING, "mm", "va 0x%x%x already in pgdir %x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
         return 0;
     }
 
@@ -167,12 +168,11 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     uintptr_t page = tmp->kva;
 #endif
 
-    logging(LOG_DEBUG, "mm", "... allocated page at %x%x\n", (uint64_t) page >> 32, (uint64_t)page);
+    logging(LOG_DEBUG, "mm", "... allocated page at 0x%x%x\n", (uint64_t)page>>32, (uint64_t)page);
 
     // set pgtable
     set_pfn(pte, kva2pa(page) >> NORMAL_PAGE_SHIFT);
-    set_attribute(pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE |
-                             _PAGE_EXEC | _PAGE_ACCESSED | _PAGE_DIRTY | _PAGE_USER);
+    set_attribute(pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | _PAGE_EXEC | _PAGE_USER);
 
     return page;
 }
