@@ -156,12 +156,6 @@ extern int pcb_n;
 
 #define S_CORE_P3
 
-#ifdef S_CORE_P3
-pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2);
-#else
-pid_t init_pcb(char *name, int argc, char *argv[]);
-#endif
-
 extern void switch_to(pcb_t *prev, pcb_t *next);
 void do_scheduler(void);
 void do_sleep(uint32_t);

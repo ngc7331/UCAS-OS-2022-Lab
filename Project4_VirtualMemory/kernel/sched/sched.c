@@ -115,15 +115,23 @@ pcb_t *pcb_dequeue(list_node_t *queue, unsigned cid) {
 }
 
 #ifdef S_CORE_P3
-pid_t init_pcb(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
 #else
-pid_t init_pcb(char *name, int argc, char *argv[]) {
+pid_t do_exec(char *name, int argc, char *argv[]) {
     int id = get_taskid_by_name(name, APP);
 #endif
     if (id < 0 || id >= appnum)
         return 0;
 
     int cid = get_current_cpu_id();
+
+#ifdef S_CORE_P3
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, id, argc, arg0, arg1, arg2);
+#else
+    logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, name, argc, argv);
+#endif
 
     // init page_list
     list_init(&pcb[pcb_n].page_list);
@@ -268,22 +276,6 @@ void do_unblock(list_head *queue) {
     pcb->status = TASK_READY;
     pcb_enqueue(&ready_queue, pcb);
 }
-
-#ifdef S_CORE_P3
-pid_t do_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
-    int cid = get_current_cpu_id();
-    logging(LOG_INFO, "scheduler", "%d.%s.%d exec id=%d, argc=%d, arg0=%ld, arg1=%ld, arg2=%ld\n",
-            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, id, argc, arg0, arg1, arg2);
-    return init_pcb(id, argc, arg0, arg1, arg2);
-}
-#else
-pid_t do_exec(char *name, int argc, char *argv[]) {
-    int cid = get_current_cpu_id();
-    logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n",
-            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, name, argc, argv);
-    return init_pcb(name, argc, argv);
-}
-#endif
 
 void do_exit(void) {
     int cid = get_current_cpu_id();

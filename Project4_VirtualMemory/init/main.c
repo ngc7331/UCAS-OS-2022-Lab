@@ -169,9 +169,9 @@ static void init_syscall(void) {
 
 void init_shell(void) {
 #ifdef S_CORE_P3
-    init_pcb(0, 0, 0, 0, 0);
+    do_exec(0, 0, 0, 0, 0);
 #else
-    init_pcb("shell", 0, NULL);
+    do_exec("shell", 0, NULL);
 #endif
 }
 
@@ -185,7 +185,7 @@ int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
         // set log level
-        set_loglevel(LOG_VERBOSE);
+        set_loglevel(LOG_DEBUG);
 
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
