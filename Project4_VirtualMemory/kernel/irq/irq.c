@@ -3,10 +3,14 @@
 #include <os/sched.h>
 #include <os/string.h>
 #include <os/kernel.h>
+#include <os/mm.h>
+#include <os/smp.h>
+#include <os/loader.h>
 #include <printk.h>
 #include <assert.h>
 #include <csr.h>
 #include <screen.h>
+#include <pgtable.h>
 
 handler_t irq_table[IRQC_COUNT];
 handler_t exc_table[EXCC_COUNT];
@@ -34,6 +38,21 @@ void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
     do_scheduler();
 }
 
+void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
+    int cid = get_current_cpu_id();
+    int code = scause & ~SCAUSE_IRQ_FLAG;
+    logging(LOG_DEBUG, "pgfault", "badaddr=0x%x, tp=%s\n", stval,
+            code == EXCC_INST_PAGE_FAULT ? "INST" : code == EXCC_LOAD_ACCESS ? "LOAD" : "STORE");
+
+    // alloc a new page for badaddr
+    alloc_page_helper(stval, current_running[cid]);
+    // reflush hardware
+    local_flush_tlb_all();
+    if (code == EXCC_INST_PAGE_FAULT) {
+        local_flush_icache_all();
+    }
+}
+
 void init_exception()
 {
     /* initialize exc_table
@@ -41,6 +60,9 @@ void init_exception()
     for (int i=0; i<EXCC_COUNT; i++)
         exc_table[i] = handle_other;
     exc_table[EXCC_SYSCALL] = handle_syscall;
+    exc_table[EXCC_INST_PAGE_FAULT] = handle_page_fault;
+    exc_table[EXCC_LOAD_PAGE_FAULT] = handle_page_fault;
+    exc_table[EXCC_STORE_PAGE_FAULT] = handle_page_fault;
 
     /* initialize irq_table
      * handle_int, handle_other, etc.*/
