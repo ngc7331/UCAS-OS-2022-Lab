@@ -168,15 +168,21 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     share_pgtable(pcb[idx].pgdir, pid0_pcb[cid].pgdir);
 
     // allocate new pages and load task to it
-    // if S_CORE, alloc a large page; else, alloc first normal page
+    // if S_CORE, alloc a large page
+#ifdef S_CORE
     uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[idx]);
-#ifndef S_CORE
-    // and alloc remaining normal pages
-    for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
-        alloc_page_helper(apps[id].entrypoint + i, &pcb[idx]);
+    load_img(page, apps[id].phyaddr, apps[id].size);
+#else
+    // else, alloc normal pages
+    uint64_t va = apps[id].entrypoint;
+    uint64_t pa = apps[id].phyaddr;
+    uint64_t end = apps[id].size+apps[id].entrypoint;
+    for (; va < end; va += PAGE_SIZE, pa += PAGE_SIZE) {
+        uintptr_t page = alloc_page_helper(va, &pcb[idx]);
+        uint64_t size = end-va < PAGE_SIZE ? end-va : PAGE_SIZE;
+        load_img(page, pa, size);
     }
 #endif
-    load_img(page, apps[id].phyaddr, apps[id].size);
 
     // allocate a new page for kernel stack, set user stack
     tmp = alloc_page1();
@@ -209,8 +215,8 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     pcb[idx].retval = NULL;
     pcb[idx].joined = NULL;
 
-    logging(LOG_INFO, "scheduler", "load %s as pid=%d\n", pcb[idx].name, pcb[idx].pid);
-    logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x, page=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir, page >> 32, page);
+    logging(LOG_INFO, "scheduler", "loaded %s as pid=%d\n", pcb[idx].name, pcb[idx].pid);
+    logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir);
     logging(LOG_DEBUG, "scheduler", "... entrypoint=0x%lx\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[idx].kernel_sp, pcb[idx].user_sp, user_stack_kva,

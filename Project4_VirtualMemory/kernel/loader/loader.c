@@ -2,6 +2,7 @@
 #include <os/loader.h>
 #include <os/string.h>
 #include <os/mm.h>
+#include <printk.h>
 
 #define SECTOR_SIZE 512
 #define MAX_SECTOR_READ 64
@@ -12,6 +13,9 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size) {
     if (buff == 0)
         buff = allocPage(SECTOR_SIZE * MAX_SECTOR_READ / PAGE_SIZE);
     uint64_t memaddr_ori = memaddr;
+
+    logging(LOG_INFO, "loader", "load 0x%x%x bytes from 0x%x%x to 0x%x%x\n",
+            size>>32, size, phyaddr>>32, phyaddr, memaddr>>32, memaddr);
 
     uint64_t block_id = phyaddr / SECTOR_SIZE;
 

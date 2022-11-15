@@ -33,13 +33,13 @@ page_t *alloc_page1(void) {
         page = list_entry(freepage_list.next, page_t, list);
         list_delete(freepage_list.next);
         page->ref ++;
-        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
+        logging(LOG_VERBOSE, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
         list_init(&page->list);
         page->ref = 1;
-        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
+        logging(LOG_VERBOSE, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
     return page;
 }
@@ -48,7 +48,7 @@ void free_page1(page_t *page) {
     if (--page->ref <= 0) {
         list_delete(&page->list);
         list_insert(&freepage_list, &page->list);
-        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
+        logging(LOG_VERBOSE, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
     }
 }
 
