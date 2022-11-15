@@ -71,6 +71,17 @@ void *kmalloc(size_t size) {
     return ret;
 }
 
+void do_garbage_collector(void) {
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
+        if (pcb[i].status != TASK_EXITED)
+            continue;
+        while (!list_is_empty(&pcb[i].page_list)) {
+            free_page1(list_entry(pcb[i].page_list.next, page_t, list));
+        }
+    }
+}
 
 /* this is used for mapping kernel virtual address into user page table */
 void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {

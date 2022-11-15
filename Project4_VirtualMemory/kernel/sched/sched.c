@@ -138,6 +138,9 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     logging(LOG_INFO, "scheduler", "%d.%s.%d exec name=%s, argc=%d, argv=%x\n",
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, name, argc, argv);
 #endif
+
+    do_garbage_collector();
+
     if (id < 0 || id >= appnum) {
         logging(LOG_ERROR, "scheduler", "invalid name / id\n");
         return 0;

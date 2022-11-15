@@ -55,6 +55,8 @@ extern ptr_t allocPage(int numPage);
 page_t *alloc_page1(void);
 void free_page1(page_t *page);
 
+void do_garbage_collector(void);
+
 // #define S_CORE
 // NOTE: only need for S-core to alloc 2MB large page
 #ifdef S_CORE
