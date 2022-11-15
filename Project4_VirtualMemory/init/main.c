@@ -185,15 +185,15 @@ int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
         // set log level
-        set_loglevel(LOG_DEBUG);
+        set_loglevel(LOG_VERBOSE);
 
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
         logging(LOG_INFO, "init", "Jump table initialization succeeded.\n");
 
-        // upmap boot address
-        unmap_boot_addr();
-        logging(LOG_INFO, "init", "Unmapped boot address[0x50000000, 0x54000000)\n");
+        // FIXME: when to? upmap boot address
+        // unmap_boot_addr();
+        // logging(LOG_INFO, "init", "Unmapped boot address[0x50000000, 0x54000000)\n");
 
         // Init task information (〃'▽'〃)
         init_task_info();

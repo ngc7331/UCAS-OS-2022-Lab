@@ -97,6 +97,9 @@ typedef struct pcb
     /* pgdir */
     uintptr_t pgdir;
 
+    /* page list */
+    list_head page_list;
+
     /* process id & thread id
      * for TYPE_PROCESS:
      *   pid is valid

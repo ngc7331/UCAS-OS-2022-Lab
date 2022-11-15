@@ -125,25 +125,32 @@ pid_t init_pcb(char *name, int argc, char *argv[]) {
 
     int cid = get_current_cpu_id();
 
+    // init page_list
+    list_init(&pcb[pcb_n].page_list);
+
     // allocate a new pgdir and copy from kernel
-    pcb[pcb_n].pgdir = allocPage(1);
+    page_t *tmp = alloc_page1();
+    list_insert(&pcb[pcb_n].page_list, &tmp->list);
+    pcb[pcb_n].pgdir = tmp->kva;
     share_pgtable(pcb[pcb_n].pgdir, pid0_pcb[cid].pgdir);
 
     // allocate new pages and load task to it
     // if S_CORE, alloc a large page; else, alloc first normal page
-    uintptr_t page = alloc_page_helper(apps[id].entrypoint, pcb[pcb_n].pgdir);
+    uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[pcb_n]);
 #ifndef S_CORE
     // and alloc remaining normal pages
     for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
-        alloc_page_helper(apps[id].entrypoint + i, pcb[pcb_n].pgdir);
+        alloc_page_helper(apps[id].entrypoint + i, &pcb[pcb_n]);
     }
 #endif
     load_img(page, apps[id].phyaddr, apps[id].size, 1);
 
     // allocate a new page for kernel stack, set user stack
-    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = allocPage(1) + PAGE_SIZE;
+    tmp = alloc_page1();
+    list_insert(&pcb[pcb_n].page_list, &tmp->list);
+    pcb[pcb_n].kernel_sp = pcb[pcb_n].kernel_stack_base = tmp->kva + PAGE_SIZE;
 #ifndef S_CORE
-    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, pcb[pcb_n].pgdir) + PAGE_SIZE;
+    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, &pcb[pcb_n]) + PAGE_SIZE;
 #endif
     pcb[pcb_n].user_sp = pcb[pcb_n].user_stack_base = USER_STACK_ADDR;
 

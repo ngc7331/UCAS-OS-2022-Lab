@@ -5,6 +5,8 @@
 // NOTE: A/C-core
 static ptr_t kernMemCurr = FREEMEM_KERNEL;
 
+LIST_HEAD(freepage_list);
+
 ptr_t allocPage(int numPage)
 {
     // align PAGE_SIZE
@@ -25,14 +27,48 @@ ptr_t allocLargePage(int numPage)
 }
 #endif
 
-void freePage(ptr_t baseAddr)
-{
-    // TODO [P4-task1] (design you 'freePage' here if you need):
+page_t *alloc_page1(void) {
+    page_t *page;
+    if (!list_is_empty(&freepage_list)) {
+        page = list_entry(freepage_list.next, page_t, list);
+        list_delete(&freepage_list.next);
+        page->ref ++;
+        logging(LOG_INFO, "mm", "reuse page at 0x%x%x\n", page->kva << 32, page->kva);
+    } else {
+        page = (page_t *) kmalloc(sizeof(page_t));
+        page->kva = allocPage(1);
+        list_init(&page->list);
+        page->ref = 1;
+        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x\n", page->kva << 32, page->kva);
+    }
+    return page;
 }
 
-void *kmalloc(size_t size)
-{
-    // TODO [P4-task1] (design you 'kmalloc' here if you need):
+void free_page1(page_t *page) {
+    if (--page->ref <= 0) {
+        list_delete(&page->list);
+        list_insert(&freepage_list, &page->list);
+        logging(LOG_INFO, "mm", "freed page at 0x%x%x\n", page->kva << 32, page->kva);
+    }
+}
+
+void *kmalloc(size_t size) {
+    if (size > PAGE_SIZE) {
+        logging(LOG_ERROR, "mm", "currently unable to kmalloc mem larger than 4K\n");
+        return NULL;
+    }
+    static size_t remaining = 0;
+    static ptr_t p = 0;
+    if (remaining < size) {
+        // NOTE: this can't be freed
+        remaining = PAGE_SIZE;
+        p = allocPage(1);
+        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x for kmalloc\n", p<<32, p);
+    }
+    remaining -= size;
+    void *ret = (void *) p;
+    p += size;
+    return ret;
 }
 
 
@@ -49,9 +85,9 @@ void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {
 /* allocate physical page for `va`, mapping it into `pgdir`,
    return the kernel virtual address for the page
    */
-uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
+uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     // 3 level pgtables
-    PTE *pt2 = (PTE *) pgdir;
+    PTE *pt2 = (PTE *) pcb->pgdir;
     PTE *pt1 = NULL;
     PTE *pt0 = NULL;
 
@@ -60,13 +96,15 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
-    logging(LOG_INFO, "mm", "allocate page for addr %x%x in pgtable at %x%x\n", va>>32, va, pgdir>>32, pgdir);
+    logging(LOG_INFO, "mm", "allocate page for addr %x%x in pgtable at %x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=%x, vpn1=%x, vpn0=%x\n", vpn2, vpn1, vpn0);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
-        uintptr_t page = allocPage(1);
+        page_t *tmp = alloc_page1();
+        list_insert(&pcb->page_list, &tmp->list);
+        uintptr_t page = tmp->kva;
         set_pfn(&pt2[vpn2], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt2[vpn2], _PAGE_PRESENT);
         clear_pgdir(page);
@@ -84,7 +122,9 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
     // find level-0 pgtable
     if (!(pt1[vpn1] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
-        uintptr_t page = allocPage(1);
+        page_t *tmp = alloc_page1();
+        list_insert(&pcb->page_list, &tmp->list);
+        uintptr_t page = tmp->kva;
         set_pfn(&pt1[vpn1], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt1[vpn1], _PAGE_PRESENT);
         clear_pgdir(page);
@@ -103,7 +143,7 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
 
     // FIXME: conflict?
     if (*pte & _PAGE_PRESENT) {
-        logging(LOG_ERROR, "mm", "va %lx already in pgdir %lx\n", va, pgdir);
+        logging(LOG_ERROR, "mm", "va %lx already in pgdir %lx\n", va, pcb->pgdir);
         return 0;
     }
 
@@ -111,7 +151,9 @@ uintptr_t alloc_page_helper(uintptr_t va, uintptr_t pgdir) {
 #ifdef S_CORE
     uintptr_t page = allocLargePage(1);
 #else
-    uintptr_t page = allocPage(1);
+    page_t *tmp = alloc_page1();
+    list_insert(&pcb->page_list, &tmp->list);
+    uintptr_t page = tmp->kva;
 #endif
 
     logging(LOG_DEBUG, "mm", "... allocated page at %x%x\n", (uint64_t) page >> 32, (uint64_t)page);

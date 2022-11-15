@@ -1,6 +1,7 @@
 #include <os/kernel.h>
 #include <os/loader.h>
 #include <os/string.h>
+#include <os/mm.h>
 
 #define SECTOR_SIZE 512
 
