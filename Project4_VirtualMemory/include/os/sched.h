@@ -154,7 +154,7 @@ extern pcb_t pcb[NUM_MAX_TASK];
 extern pcb_t pid0_pcb[2];
 extern const ptr_t pid0_stack[2];
 
-#define S_CORE_P3
+// #define S_CORE_P3
 
 void init_pcbs(void);
 

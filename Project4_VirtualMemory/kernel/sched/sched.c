@@ -41,7 +41,7 @@ void init_pcbs(void) {
 }
 
 static void init_pcb_stack(
-    ptr_t kernel_stack, ptr_t user_stack, ptr_t entry_point,
+    ptr_t kernel_stack, ptr_t user_stack, ptr_t user_stack_kva, ptr_t entry_point,
     pcb_t *pcb, int argc,
 #ifdef S_CORE_P3
     uint64_t arg0, uint64_t arg1, uint64_t arg2
@@ -58,6 +58,7 @@ static void init_pcb_stack(
         (regs_context_t *)(kernel_stack - sizeof(regs_context_t));
 
     char *user_sp = (char *) user_stack;
+    char *user_sp_kva = (char *) user_stack_kva;
 
     for (int i=0; i<32; i++)
         pt_regs->regs[i] = 0;
@@ -72,16 +73,20 @@ static void init_pcb_stack(
     pt_regs->regs[13] = arg2;
     logging(LOG_DEBUG, "scheduler", "... arg0=%ld, arg1=%ld, arg2=%ld\n", arg0, arg1, arg2);
 #else
-    char **pt_argv = (char **) (user_stack - (argc + 1) * 8);
-    user_sp = (char *) pt_argv;
+    user_sp -= (argc + 1) * 8;
+    pt_regs->regs[11] = (reg_t) user_sp;
+    user_sp_kva -= (argc + 1) * 8;
+    char **pt_argv = (char **) user_sp_kva;
     for (int i=0; i<argc; i++) {
-        user_sp -= strlen(argv[i]) + 1;
-        strcpy(user_sp, argv[i]);
+        int len = strlen(argv[i]) + 1;
+        user_sp -= len;
+        user_sp_kva -= len;
+        strcpy(user_sp_kva, argv[i]);
         pt_argv[i] = user_sp;
-        logging(LOG_DEBUG, "scheduler", "... argv[%d]=\"%s\" placed at %x\n", i, pt_argv[i], user_sp);
+        logging(LOG_DEBUG, "scheduler", "... argv[%d]=\"%s\" placed at va=%x%x(kva=0x%x%x)\n",
+                i, argv[i], (uint64_t)user_sp>>32, (uint64_t)user_sp, (uint64_t)user_sp_kva>>32, (uint64_t)user_sp_kva);
     }
     pt_argv[argc] = NULL;
-    pt_regs->regs[11] = (reg_t) pt_argv;
     // alignment
     user_sp = (char *) ROUNDDOWN(user_sp, 16);
 #endif
@@ -166,6 +171,7 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     // if S_CORE, alloc a large page; else, alloc first normal page
     uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[idx]);
 #ifndef S_CORE
+    // FIXME: remove this
     // and alloc remaining normal pages
     for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
         alloc_page_helper(apps[id].entrypoint + i, &pcb[idx]);
@@ -177,8 +183,10 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     tmp = alloc_page1();
     list_insert(&pcb[idx].page_list, &tmp->list);
     pcb[idx].kernel_sp = pcb[idx].kernel_stack_base = tmp->kva + PAGE_SIZE;
-#ifndef S_CORE
-    alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, &pcb[idx]) + PAGE_SIZE;
+#ifdef S_CORE
+    uintptr_t user_stack_kva = page + USER_STACK_ADDR - apps[id].entrypoint;
+#else
+    uintptr_t user_stack_kva = alloc_page_helper(USER_STACK_ADDR - PAGE_SIZE, &pcb[idx]) + PAGE_SIZE;
 #endif
     pcb[idx].user_sp = pcb[idx].user_stack_base = USER_STACK_ADDR;
 
@@ -206,7 +214,8 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x, page=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir, page >> 32, page);
     logging(LOG_DEBUG, "scheduler", "... entrypoint=0x%lx\n", apps[id].entrypoint);
 
-    init_pcb_stack(pcb[idx].kernel_sp, pcb[idx].user_sp, apps[id].entrypoint, &pcb[idx], argc,
+    init_pcb_stack(pcb[idx].kernel_sp, pcb[idx].user_sp, user_stack_kva,
+                   apps[id].entrypoint, &pcb[idx], argc,
 #ifdef S_CORE_P3
                    arg0, arg1, arg2
 #else
