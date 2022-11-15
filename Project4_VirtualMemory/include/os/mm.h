@@ -57,7 +57,7 @@ void free_page1(page_t *page);
 
 void do_garbage_collector(void);
 
-// #define S_CORE
+#define S_CORE
 // NOTE: only need for S-core to alloc 2MB large page
 #ifdef S_CORE
 #define LARGE_PAGE_FREEMEM 0xffffffc056000000
