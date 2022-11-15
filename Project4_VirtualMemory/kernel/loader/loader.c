@@ -27,7 +27,7 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size) {
 
     // load
     while (num_of_blocks > 0) {
-        if (bios_sdread(buff, num_of_blocks > MAX_SECTOR_READ ? MAX_SECTOR_READ : num_of_blocks, block_id) != 0) {
+        if (bios_sdread(kva2pa(buff), num_of_blocks > MAX_SECTOR_READ ? MAX_SECTOR_READ : num_of_blocks, block_id) != 0) {
             return 0;
         }
         num_of_blocks -= MAX_SECTOR_READ;

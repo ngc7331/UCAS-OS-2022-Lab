@@ -86,7 +86,6 @@ void do_garbage_collector(void) {
 
 /* this is used for mapping kernel virtual address into user page table */
 void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {
-    // FIXME: share_pgtable
     PTE *src = (PTE *) src_pgdir;
     PTE *dest = (PTE *) dest_pgdir;
     for (int i=0; i<NUM_PTE_ENTRY; i++) {

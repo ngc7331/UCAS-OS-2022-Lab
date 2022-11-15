@@ -42,10 +42,21 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
     int cid = get_current_cpu_id();
     int code = scause & ~SCAUSE_IRQ_FLAG;
     logging(LOG_DEBUG, "pgfault", "badaddr=0x%x, tp=%s\n", stval,
-            code == EXCC_INST_PAGE_FAULT ? "INST" : code == EXCC_LOAD_ACCESS ? "LOAD" : "STORE");
+            code == EXCC_INST_PAGE_FAULT ? "INST" : code == EXCC_LOAD_PAGE_FAULT ? "LOAD" : "STORE");
 
-    // alloc a new page for badaddr
-    alloc_page_helper(stval, current_running[cid]);
+    // get pte
+    PTE *pte = get_pte_of(stval, current_running[cid]->pgdir);
+    // if not present, alloc a new page for badaddr
+    if (pte == NULL) {
+        alloc_page_helper(stval, current_running[cid]);
+        pte = get_pte_of(stval, current_running[cid]->pgdir);
+    }
+    // set attribute
+    if (code == EXCC_LOAD_PAGE_FAULT) {
+        set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) | _PAGE_ACCESSED);
+    } else if (code == EXCC_STORE_PAGE_FAULT) {
+        set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) | _PAGE_ACCESSED | _PAGE_DIRTY);
+    }
     // reflush hardware
     local_flush_tlb_all();
     if (code == EXCC_INST_PAGE_FAULT) {
