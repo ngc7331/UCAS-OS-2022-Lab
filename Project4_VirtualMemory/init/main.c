@@ -65,8 +65,7 @@ static void init_task_info(void) {
     long phyaddr = *((long *) TASK_INFO_P_LOC);
     short tasknum = *((short *) TASK_NUM_LOC);
     // read img to some random memory
-    task_info_t *task = (task_info_t *) load_img(APP_MEM_BASE, phyaddr,
-                                                 sizeof(task_info_t) * tasknum, FALSE);
+    task_info_t *task = (task_info_t *) load_img_tmp(phyaddr, sizeof(task_info_t) * tasknum);
     for (int i=0; i<tasknum; i++) {
         if (task->type == APP) {
             apps[appnum].loaded = 0;
@@ -173,12 +172,6 @@ void init_shell(void) {
 #else
     do_exec("shell", 0, NULL);
 #endif
-}
-
-static void preload_apps(void) {
-    for (int i=0; i<appnum; i++) {
-        load_task_img(i, APP, 1);
-    }
 }
 
 int main(void) {

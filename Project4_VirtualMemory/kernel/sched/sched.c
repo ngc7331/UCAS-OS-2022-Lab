@@ -171,13 +171,12 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     // if S_CORE, alloc a large page; else, alloc first normal page
     uintptr_t page = alloc_page_helper(apps[id].entrypoint, &pcb[idx]);
 #ifndef S_CORE
-    // FIXME: remove this
     // and alloc remaining normal pages
     for (uint64_t i=PAGE_SIZE; i<apps[id].memsize; i+=PAGE_SIZE) {
         alloc_page_helper(apps[id].entrypoint + i, &pcb[idx]);
     }
 #endif
-    load_img(page, apps[id].phyaddr, apps[id].size, 1);
+    load_img(page, apps[id].phyaddr, apps[id].size);
 
     // allocate a new page for kernel stack, set user stack
     tmp = alloc_page1();

@@ -4,7 +4,7 @@
 #include <type.h>
 #include <os/task.h>
 
-uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size, int copy);
-uint64_t load_task_img(int taskid, task_type_t type, int overwrite);
+uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size);
+uint64_t load_img_tmp(uint64_t phyaddr, uint64_t size);
 
 #endif

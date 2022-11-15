@@ -3,11 +3,7 @@
 
 #include <type.h>
 
-#define APP_MEM_BASE     0xffffffc052000000
 #define APP_MAXNUM       64
-#define APP_SIZE         0x10000
-
-#define BATCH_MEM_BASE   (APP_MEM_BASE + APP_MAXNUM * APP_SIZE)
 #define BATCH_MAXNUM     16
 
 // task type
