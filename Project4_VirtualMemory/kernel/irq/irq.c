@@ -41,7 +41,7 @@ void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
 void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
     int cid = get_current_cpu_id();
     int code = scause & ~SCAUSE_IRQ_FLAG;
-    logging(LOG_DEBUG, "pgfault", "badaddr=0x%x, tp=%s\n", stval,
+    logging(LOG_DEBUG, "pgfault", "epc=0x%x, badaddr=0x%x, tp=%s\n", regs->sepc, stval,
             code == EXCC_INST_PAGE_FAULT ? "INST" : code == EXCC_LOAD_PAGE_FAULT ? "LOAD" : "STORE");
 
     // get pte
