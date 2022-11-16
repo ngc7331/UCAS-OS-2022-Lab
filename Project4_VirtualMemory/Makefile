@@ -71,7 +71,7 @@ DIR_TEST_PROJ   = $(DIR_TEST)/test_project$(PROJECT_IDX)
 
 BOOTLOADER_ENTRYPOINT   = 0x50200000
 KERNEL_ENTRYPOINT       = 0xffffffc050202000
-USER_ENTRYPOINT         = 0x200000
+USER_ENTRYPOINT         = 0x10000
 
 # -----------------------------------------------------------------------
 # UCAS-OS Kernel Source Files
@@ -196,5 +196,6 @@ image: $(ELF_CREATEIMAGE) $(ELF_BOOT) $(ELF_MAIN) $(ELF_USER)
 	else \
 		cd $(DIR_BUILD) && ./$(<F) --extended $(filter-out $(<F), $(^F)); \
 	fi
+	dd if=/dev/zero of=$(DIR_BUILD)/image oflag=append conv=notrunc bs=32MB count=2
 
 .PHONY: image

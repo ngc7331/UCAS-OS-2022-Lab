@@ -136,34 +136,34 @@ static inline int pte_is_leaf(PTE entry) {
 /* query the page table stored in pgdir_va to obtain the page table entry
  * or the physical address corresponding to the virtual address va.
  */
-static inline PTE *get_pte_of(uintptr_t va, uintptr_t pgdir_va) {
+static inline PTE *get_pte_of(uintptr_t va, uintptr_t pgdir_va, uint8_t allow_invalid) {
     uint64_t vpn2 = va >> (NORMAL_PAGE_SHIFT + PPN_BITS + PPN_BITS);
     uint64_t vpn1 = (va >> (NORMAL_PAGE_SHIFT + PPN_BITS)) & VPN_MASK;
     uint64_t vpn0 = (va >> NORMAL_PAGE_SHIFT) & VPN_MASK;
 
     // query level-2 pgtable
     PTE *pt2 = (PTE *) pgdir_va;
-    if (!pte_is_valid(pt2[vpn2])) // not present
+    if (!(pte_is_valid(pt2[vpn2]) || allow_invalid & 1)) // not present
         return NULL;
     if (pte_is_leaf(pt2[vpn2])) // is leaf
         return &pt2[vpn2];
 
     // query level-1 pgtable
     PTE *pt1 = (PTE *) pa2kva(get_pa(pt2[vpn2]));
-    if (!pte_is_valid(pt1[vpn1])) // not present
+    if (!(pte_is_valid(pt1[vpn1]) || allow_invalid & 2)) // not present
         return NULL;
     if (pte_is_leaf(pt1[vpn1])) // is leaf
         return &pt1[vpn1];
 
     // query level-0 pgtable
     PTE *pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
-    if (!pte_is_valid(pt0[vpn0])) // not present
+    if (!(pte_is_valid(pt0[vpn0]) || allow_invalid & 4)) // not present
         return NULL;
     return &pt0[vpn0]; // must be leaf in SV39 mode
 }
 
 static inline uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va) {
-    return pa2kva(get_pa(*get_pte_of(va, pgdir_va)));
+    return pa2kva(get_pa(*get_pte_of(va, pgdir_va, 0)));
 }
 
 static inline uint64_t getvpn2(uint64_t va) {

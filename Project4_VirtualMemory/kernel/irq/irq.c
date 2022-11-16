@@ -41,15 +41,19 @@ void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
 void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
     int cid = get_current_cpu_id();
     int code = scause & ~SCAUSE_IRQ_FLAG;
-    logging(LOG_DEBUG, "pgfault", "epc=0x%x, badaddr=0x%x, tp=%s\n", regs->sepc, stval,
+    logging(LOG_DEBUG, "pgfault", "%d.%s.%d epc=0x%x, badaddr=0x%x, tp=%s\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, regs->sepc, stval,
             code == EXCC_INST_PAGE_FAULT ? "INST" : code == EXCC_LOAD_PAGE_FAULT ? "LOAD" : "STORE");
 
     // get pte
-    PTE *pte = get_pte_of(stval, current_running[cid]->pgdir);
+    PTE *pte = get_pte_of(stval, current_running[cid]->pgdir, 0);
     // if not present, alloc a new page for badaddr
     if (pte == NULL) {
-        alloc_page_helper(stval, current_running[cid]);
-        pte = get_pte_of(stval, current_running[cid]->pgdir);
+        if (check_and_swap(current_running[cid], stval) == NULL)
+            alloc_page_helper(stval, current_running[cid]);
+        pte = get_pte_of(stval, current_running[cid]->pgdir, 0);
+    } else {
+        logging(LOG_CRITICAL, "test", "else\n");
     }
     // set attribute
     if (code == EXCC_LOAD_PAGE_FAULT) {

@@ -1,11 +1,26 @@
+#include <os/kernel.h>
 #include <os/mm.h>
+#include <os/task.h>
 #include <printk.h>
 #include <pgtable.h>
+
+#include <assert.h>
 
 // NOTE: A/C-core
 static ptr_t kernMemCurr = FREEMEM_KERNEL;
 
+// limit page frame to test swap
+/* NOTE: only pages used by user is caculated
+ * pgdir / kernel stack are excluded
+ */
+#define PAGEFRAME_LIMIT 20
+unsigned remaining_pf = PAGEFRAME_LIMIT;
+
+#define SECTOR_SIZE 512
+#define TASK_INFO_P_LOC 0xffffffc0502001f2
+
 LIST_HEAD(freepage_list);
+LIST_HEAD(onmem_list);
 
 ptr_t allocPage(int numPage)
 {
@@ -31,15 +46,21 @@ page_t *alloc_page1(void) {
     page_t *page;
     if (!list_is_empty(&freepage_list)) {
         page = list_entry(freepage_list.next, page_t, list);
+        page->va = 0;
         list_delete(freepage_list.next);
+        list_delete(&page->onmem);
         page->ref ++;
-        logging(LOG_VERBOSE, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
+        page->tp = PAGE_KERNEL;
+        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
+        page->va = 0;
         list_init(&page->list);
+        list_init(&page->onmem);
         page->ref = 1;
-        logging(LOG_VERBOSE, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
+        page->tp = PAGE_KERNEL;
+        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
     return page;
 }
@@ -47,8 +68,14 @@ page_t *alloc_page1(void) {
 void free_page1(page_t *page) {
     if (--page->ref <= 0) {
         list_delete(&page->list);
+        if (page->kva == 0) // not on memory
+            return ;
+        list_delete(&page->onmem);
         list_insert(&freepage_list, &page->list);
-        logging(LOG_VERBOSE, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
+        page->owner = NULL;
+        if (page->tp == PAGE_USER)
+            remaining_pf ++;
+        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
     }
 }
 
@@ -162,8 +189,22 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
 #ifdef S_CORE
     uintptr_t page = allocLargePage(1);
 #else
-    page_t *tmp = alloc_page1();
+    page_t *tmp;
+    if (remaining_pf == 0) {
+        tmp = (page_t *) kmalloc(sizeof(page_t));
+        tmp->kva = swap_out();
+        list_init(&tmp->list);
+        list_init(&tmp->onmem);
+        tmp->ref = 1;
+    } else {
+        remaining_pf --;
+        tmp = alloc_page1();
+    }
+    tmp->tp = PAGE_USER;
+    list_insert(onmem_list.prev, &tmp->onmem);
     list_insert(&pcb->page_list, &tmp->list);
+    tmp->owner = pcb;
+    tmp->va = va & ~(PAGE_SIZE - 1);
     uintptr_t page = tmp->kva;
 #endif
 
@@ -174,6 +215,67 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     set_attribute(pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | _PAGE_EXEC | _PAGE_USER);
 
     return page;
+}
+
+// FIFO swap
+uintptr_t swap_out() {
+    logging(LOG_INFO, "swap", "store page to disk\n");
+    // FIXME: space on disk is not reusable now
+    static unsigned int diskptr = 0;
+    if (diskptr == 0)
+        diskptr = (*((long *) TASK_INFO_P_LOC) + (appnum + batchnum) * sizeof(task_info_t)) / SECTOR_SIZE + 1;
+    // delete from onmem
+    page_t *page = list_entry(onmem_list.next, page_t, onmem);
+    list_delete(onmem_list.next);
+    logging(LOG_DEBUG, "swap", "... from 0x%x%x\n", page->kva>>32, page->kva);
+    // set pfn & attr
+    PTE *pte = get_pte_of(page->va, page->owner->pgdir, 0);
+    set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) & ~_PAGE_PRESENT);
+    // store to disk
+    bios_sdwrite(kva2pa(page->kva), PAGE_SIZE/SECTOR_SIZE, diskptr);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=%x%x, diskptr=%x\n", page->owner->pid, page->va>>32, page->va, diskptr);
+    page->swappa = diskptr;
+    diskptr += PAGE_SIZE/SECTOR_SIZE;
+    // reset kva
+    uintptr_t kva = page->kva;
+    page->kva = 0;
+    return kva;
+}
+
+void swap_in(page_t *page, uintptr_t kva) {
+    logging(LOG_INFO, "swap", "load page from disk\n");
+    logging(LOG_DEBUG, "swap", "... to 0x%x%x\n", kva>>32, kva);
+    // reset kva
+    page->kva = kva;
+    // load from disk
+    bios_sdread(kva2pa(kva), PAGE_SIZE/SECTOR_SIZE, page->swappa);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=%x%x, diskptr=%x\n", page->owner->pid, page->va>>32, page->va, page->swappa);
+    page->swappa = 0;
+    // set pfn & attr
+    PTE *pte = get_pte_of(page->va, page->owner->pgdir, 4);
+    set_pfn(pte, kva2pa(kva) >> NORMAL_PAGE_SHIFT);
+    set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) | _PAGE_PRESENT);
+    // insert into onmem
+    list_insert(onmem_list.prev, &page->onmem);
+}
+
+page_t *check_and_swap(pcb_t *pcb, uintptr_t va) {
+    for (list_node_t *p = pcb->page_list.next; p!=&pcb->page_list; p=p->next) {
+        page_t *page = list_entry(p, page_t, list);
+        if (page->va != (va & ~(PAGE_SIZE-1))) {
+            continue;
+        }
+        if (page->swappa == 0) {
+            if (page->tp != PAGE_USER)
+                continue;
+            logging(LOG_ERROR, "swap", "page record found, but not on disk, kva=0x%x%x\n", page->kva>>32, page->kva);
+            return NULL;
+        }
+        uintptr_t kva = swap_out();
+        swap_in(page, kva);
+        return page;
+    }
+    return NULL;
 }
 
 uintptr_t shm_page_get(int key)

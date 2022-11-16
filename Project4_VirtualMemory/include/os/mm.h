@@ -41,11 +41,20 @@
 #define MAX_PAGENUM 1024
 typedef struct {
     ptr_t kva;
+    ptr_t va;
+    unsigned int swappa;
     list_node_t list;
+    list_node_t onmem;
+    pcb_t *owner;
     int ref;
+    enum {
+        PAGE_USER,
+        PAGE_KERNEL
+    } tp;
 } page_t;
 
 extern list_head freepage_list;
+extern list_head onmem_list;
 
 /* Rounding; only works for n = power of two */
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
@@ -72,6 +81,11 @@ extern ptr_t allocLargePage(int numPage);
 extern void *kmalloc(size_t size);
 extern void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
 extern uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
+
+// swap
+uintptr_t swap_out();
+void swap_in(page_t *page, uintptr_t kva);
+page_t *check_and_swap(pcb_t *pcb, uintptr_t va);
 
 // TODO [P4-task4]: shm_page_get/dt */
 uintptr_t shm_page_get(int key);

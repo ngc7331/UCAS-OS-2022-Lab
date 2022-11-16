@@ -178,7 +178,7 @@ int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
         // set log level
-        set_loglevel(LOG_DEBUG);
+        set_loglevel(LOG_VERBOSE);
 
         // Init jump table provided by BIOS (ΦωΦ)
         init_jmptab();
