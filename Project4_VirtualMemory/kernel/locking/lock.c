@@ -91,6 +91,7 @@ void do_mutex_lock_acquire(int mlock_idx) {
     }
     // record pid
     mlocks[mlock_idx].pid = current_running[cid]->pid;
+    mlocks[mlock_idx].tid = current_running[cid]->tid;
 }
 
 void do_mutex_lock_release(int mlock_idx) {
@@ -108,17 +109,18 @@ void do_mutex_lock_release(int mlock_idx) {
     }
     // enable_preempt();
     mlocks[mlock_idx].pid = 0;
+    mlocks[mlock_idx].tid = 0;
 }
 
-void do_mutex_lock_release_f(pid_t pid) {
+void do_mutex_lock_release_f(pid_t pid, pid_t tid) {
     int cid = get_current_cpu_id();
     // forced release all locks held by proc
     // NOTE: should be called BY do_kill() ONLY at this moment
     if (pid != current_running[cid]->pid)
-        logging(LOG_WARNING, "locking", "%d.%s.%d forced release all mlocks held by pid=%d\n",
-                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, pid);
+        logging(LOG_WARNING, "locking", "%d.%s.%d forced release all mlocks held by pid=%d, tid=%d\n",
+                current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, pid, tid);
     for (int i=0; i<LOCK_NUM; i++) {
-        if (mlocks[i].pid == pid)
+        if (mlocks[i].pid == pid && mlocks[i].tid == tid)
             do_mutex_lock_release(i);
     }
 }
