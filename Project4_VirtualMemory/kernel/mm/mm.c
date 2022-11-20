@@ -1,6 +1,7 @@
 #include <os/kernel.h>
 #include <os/mm.h>
 #include <os/task.h>
+#include <os/pthread.h>
 #include <printk.h>
 #include <pgtable.h>
 
@@ -134,6 +135,14 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
+    list_node_t *page_list;
+    if (pcb->type == TYPE_PROCESS)
+        page_list = &pcb->page_list;
+    else {
+        logging(LOG_DEBUG, "mm", "thread alloc page, use parent's page_list\n");
+        page_list = &get_parent(pcb->pid)->page_list;
+    }
+
     logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
 
@@ -141,7 +150,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
         page_t *tmp = alloc_page1();
-        list_insert(&pcb->page_list, &tmp->list);
+        list_insert(page_list, &tmp->list);
         uintptr_t page = tmp->kva;
         set_pfn(&pt2[vpn2], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt2[vpn2], _PAGE_PRESENT);
@@ -161,7 +170,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     if (!(pt1[vpn1] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
         page_t *tmp = alloc_page1();
-        list_insert(&pcb->page_list, &tmp->list);
+        list_insert(page_list, &tmp->list);
         uintptr_t page = tmp->kva;
         set_pfn(&pt1[vpn1], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt1[vpn1], _PAGE_PRESENT);
@@ -202,7 +211,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     }
     tmp->tp = PAGE_USER;
     list_insert(onmem_list.prev, &tmp->onmem);
-    list_insert(&pcb->page_list, &tmp->list);
+    list_insert(page_list, &tmp->list);
     tmp->owner = pcb;
     tmp->va = va & ~(PAGE_SIZE - 1);
     uintptr_t page = tmp->kva;
@@ -260,6 +269,8 @@ void swap_in(page_t *page, uintptr_t kva) {
 }
 
 page_t *check_and_swap(pcb_t *pcb, uintptr_t va) {
+    if (pcb->type == TYPE_THREAD)
+        pcb = get_parent(pcb->pid);
     for (list_node_t *p = pcb->page_list.next; p!=&pcb->page_list; p=p->next) {
         page_t *page = list_entry(p, page_t, list);
         if (page->va != (va & ~(PAGE_SIZE-1))) {
@@ -280,11 +291,11 @@ page_t *check_and_swap(pcb_t *pcb, uintptr_t va) {
 
 uintptr_t shm_page_get(int key)
 {
-    // TODO [P4-task4] shm_page_get:
+    // TODO [P4-task5] shm_page_get:
     return 0;
 }
 
 void shm_page_dt(uintptr_t addr)
 {
-    // TODO [P4-task4] shm_page_dt:
+    // TODO [P4-task5] shm_page_dt:
 }

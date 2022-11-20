@@ -33,10 +33,9 @@ void sys_mutex_release(int mutex_idx);
 /* show task */
 void sys_show_task(void);
 
-/* thread */
-pid_t sys_thread_create(uint64_t entrypoint, void *arg);
-void sys_thread_join(pid_t tid, void **retval);
-void sys_thread_exit(void *retval);
+/* pthread */
+pid_t sys_pthread_create(uint64_t entrypoint, void *arg);
+int sys_pthread_join(pid_t tid);
 
 /* ps, getchar */
 void sys_ps(int mode);

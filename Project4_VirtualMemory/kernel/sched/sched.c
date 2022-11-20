@@ -123,7 +123,7 @@ pcb_t *pcb_dequeue(list_node_t *queue, unsigned cid) {
     return NULL;
 }
 
-static int new_pcb_idx() {
+int new_pcb_idx() {
     for (int i=0; i<NUM_MAX_TASK; i++) {
         if (pcb[i].status == TASK_UNUSED || pcb[i].status == TASK_EXITED)
             return i;
@@ -210,10 +210,6 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
 
     // status
     pcb[idx].status = TASK_READY;
-
-    // FIXME: pthread
-    pcb[idx].retval = NULL;
-    pcb[idx].joined = NULL;
 
     logging(LOG_INFO, "scheduler", "loaded %s as pid=%d\n", pcb[idx].name, pcb[idx].pid);
     logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir);
@@ -341,7 +337,7 @@ int do_kill(pid_t pid) {
                 do_unblock(&pcb[i].wait_list);
             }
             // forced release all locks, this will do nothing if proc doesnt hold any lock
-            do_mutex_lock_release_f(pcb[i].pid);
+            do_mutex_lock_release_f(pcb[i].pid, pcb[i].tid);
             // barrier & mbox will not be released by kernel
             // do kill
             pcb[i].status = TASK_EXITED;

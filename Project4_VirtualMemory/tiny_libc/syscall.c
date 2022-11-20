@@ -119,16 +119,12 @@ void sys_sleep(uint32_t time)
     invoke_syscall(SYSCALL_SLEEP, time, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
-pid_t sys_thread_create(uint64_t entrypoint, void *arg) {
-    return invoke_syscall(SYSCALL_THREAD_CREATE, entrypoint, (long) arg, IGNORE, IGNORE, IGNORE);
+pid_t sys_pthread_create(uint64_t entrypoint, void *arg) {
+    return invoke_syscall(SYSCALL_PTHREAD_CREATE, entrypoint, (long) arg, IGNORE, IGNORE, IGNORE);
 }
 
-void sys_thread_join(pid_t tid, void **retval) {
-    invoke_syscall(SYSCALL_THREAD_JOIN, (long) tid, (long) retval, IGNORE, IGNORE, IGNORE);
-}
-
-void sys_thread_exit(void *retval) {
-    invoke_syscall(SYSCALL_THREAD_EXIT, (long) retval, IGNORE, IGNORE, IGNORE, IGNORE);
+int sys_pthread_join(pid_t tid) {
+    return invoke_syscall(SYSCALL_PTHREAD_JOIN, tid, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
 #ifdef S_CORE_P3

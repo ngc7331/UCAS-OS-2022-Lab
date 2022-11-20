@@ -13,7 +13,7 @@
 #include <os/string.h>
 #include <os/task.h>
 #include <os/time.h>
-#include <os/thread.h>
+#include <os/pthread.h>
 #include <printk.h>
 #include <screen.h>
 #include <sys/syscall.h>
@@ -161,9 +161,8 @@ static void init_syscall(void) {
     syscall[SYSCALL_MBOX_CLOSE]    = (long (*)()) do_mbox_close;
     syscall[SYSCALL_MBOX_SEND]     = (long (*)()) do_mbox_send;
     syscall[SYSCALL_MBOX_RECV]     = (long (*)()) do_mbox_recv;
-    syscall[SYSCALL_THREAD_CREATE] = (long (*)()) thread_create;
-    syscall[SYSCALL_THREAD_JOIN]   = (long (*)()) thread_join;
-    syscall[SYSCALL_THREAD_EXIT]   = (long (*)()) thread_exit;
+    syscall[SYSCALL_PTHREAD_CREATE]= (long (*)()) pthread_create;
+    syscall[SYSCALL_PTHREAD_JOIN]  = (long (*)()) pthread_join;
 }
 
 void init_shell(void) {

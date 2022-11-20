@@ -77,7 +77,6 @@ extern ptr_t allocLargePage(int numPage);
 #define USER_STACK_ADDR 0xf00010000
 #endif
 
-// TODO [P4-task1] */
 extern void *kmalloc(size_t size);
 extern void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
 extern uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
@@ -87,10 +86,8 @@ uintptr_t swap_out();
 void swap_in(page_t *page, uintptr_t kva);
 page_t *check_and_swap(pcb_t *pcb, uintptr_t va);
 
-// TODO [P4-task4]: shm_page_get/dt */
+// TODO [P4-task5]: shm_page_get/dt */
 uintptr_t shm_page_get(int key);
 void shm_page_dt(uintptr_t addr);
-
-
 
 #endif /* MM_H */
