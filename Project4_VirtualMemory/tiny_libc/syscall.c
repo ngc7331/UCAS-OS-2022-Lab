@@ -127,6 +127,10 @@ int sys_pthread_join(pid_t tid) {
     return invoke_syscall(SYSCALL_PTHREAD_JOIN, tid, IGNORE, IGNORE, IGNORE, IGNORE);
 }
 
+void sys_pthread_exit() {
+    invoke_syscall(SYSCALL_PTHREAD_EXIT, IGNORE, IGNORE, IGNORE, IGNORE, IGNORE);
+}
+
 #ifdef S_CORE_P3
 // S-core
 pid_t sys_exec(int id, int argc, uint64_t arg0, uint64_t arg1, uint64_t arg2)

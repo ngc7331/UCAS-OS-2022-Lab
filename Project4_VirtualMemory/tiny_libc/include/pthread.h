@@ -7,6 +7,6 @@ void pthread_create(pthread_t *thread,
                    void *arg);
 
 int pthread_join(pthread_t thread);
-
+void pthread_exit();
 
 #endif

@@ -10,3 +10,7 @@ void pthread_create(pthread_t *thread,
 int pthread_join(pthread_t thread) {
     return sys_pthread_join(thread);
 }
+
+void pthread_exit() {
+    sys_pthread_exit();
+}

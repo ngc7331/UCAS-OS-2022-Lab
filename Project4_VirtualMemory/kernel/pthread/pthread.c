@@ -1,5 +1,6 @@
 #include <csr.h>
 #include <os/irq.h>
+#include <os/lock.h>
 #include <os/mm.h>
 #include <os/sched.h>
 #include <os/string.h>
@@ -98,12 +99,39 @@ pid_t pthread_create(uint64_t entrypoint, void *arg) {
 }
 
 int pthread_join(pid_t tid) {
-    return 0;
+    int cid = get_current_cpu_id();
+    int retval = 0;
+    logging(LOG_INFO, "scheduler", "%d.%s.%d join tid=%d\n",
+            current_running[cid]->pid, current_running[cid]->name, tid);
+    for (int i=0; i<NUM_MAX_TASK; i++) {
+        if (pcb[i].status == TASK_UNUSED)
+            break;
+        if (pcb[i].pid == current_running[cid]->pid && pcb[i].tid == tid && pcb[i].type == TYPE_THREAD) {
+            if (pcb[i].status != TASK_EXITED)
+                do_block(current_running[cid], &pcb[i].wait_list);
+            retval = tid;
+            break;
+        }
+    }
+    return retval;
 }
 
 void pthread_exit() {
     int cid = get_current_cpu_id();
-    if (current_running[cid]->type != TYPE_THREAD)
+    if (current_running[cid]->type != TYPE_THREAD) // only thread can call this func
         return;
-    
+    while (!list_is_empty(&current_running[cid]->wait_list)) {
+        do_unblock(&current_running[cid]->wait_list);
+    }
+    // forced release all locks, this will do nothing if proc doesnt hold any lock
+    do_mutex_lock_release_f(current_running[cid]->pid, current_running[cid]->tid);
+    // barrier & mbox will not be released by kernel
+    // do kill
+    current_running[cid]->status = TASK_EXITED;
+    // remove pcb from any queue, this will do nothing if pcb is not in a queue
+    list_delete(&current_running[cid]->list);
+    // log
+    logging(LOG_INFO, "scheduler", "thread %d.%s.%d exited\n", current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid);
+    // never returns
+    do_scheduler();
 }

@@ -163,6 +163,7 @@ static void init_syscall(void) {
     syscall[SYSCALL_MBOX_RECV]     = (long (*)()) do_mbox_recv;
     syscall[SYSCALL_PTHREAD_CREATE]= (long (*)()) pthread_create;
     syscall[SYSCALL_PTHREAD_JOIN]  = (long (*)()) pthread_join;
+    syscall[SYSCALL_PTHREAD_EXIT]  = (long (*)()) pthread_exit;
 }
 
 void init_shell(void) {

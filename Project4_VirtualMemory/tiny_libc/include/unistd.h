@@ -36,6 +36,7 @@ void sys_show_task(void);
 /* pthread */
 pid_t sys_pthread_create(uint64_t entrypoint, void *arg);
 int sys_pthread_join(pid_t tid);
+void sys_pthread_exit();
 
 /* ps, getchar */
 void sys_ps(int mode);
