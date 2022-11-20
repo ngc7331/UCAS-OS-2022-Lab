@@ -70,10 +70,9 @@
   /* Restore all general purpose registers and sepc, sstatus */
   /* HINT: Pay attention to sp again! */
 
-  // load all regs(except sp & tp) from kernel stack
+  // load all regs(except sp & tp & t0) from kernel stack
   ld   ra, OFFSET_REG_RA(sp)
   ld   gp, OFFSET_REG_GP(sp)
-  ld   t0, OFFSET_REG_T0(sp)
   ld   t1, OFFSET_REG_T1(sp)
   ld   t2, OFFSET_REG_T2(sp)
   ld   t3, OFFSET_REG_T3(sp)
@@ -106,6 +105,9 @@
   csrw CSR_SEPC, t0
   ld   t0, OFFSET_REG_SSTATUS(sp)
   csrw CSR_SSTATUS, t0
+
+  // restore t0
+  ld   t0, OFFSET_REG_T0(sp)
 
   // save kernel stack pointer to pcb
   sd   sp, PCB_KERNEL_SP(tp)
