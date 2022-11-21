@@ -117,17 +117,22 @@ void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {
     }
 }
 
+list_node_t *get_page_list(pcb_t *pcb) {
+    list_node_t *page_list;
+    if (pcb->type == TYPE_PROCESS)
+        page_list = &pcb->page_list;
+    else {
+        logging(LOG_DEBUG, "mm", "use parent's page_list\n");
+        page_list = &get_parent(pcb->pid)->page_list;
+    }
+    return page_list;
+}
+
 /* allocate physical page for `va`, mapping it into `pcb->pgdir`,
    return the kernel virtual address for the page
    */
-uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
-    // NULL
-    if (va == 0) {
-        logging(LOG_ERROR, "mm", "alloc page for addr 0x0 is prohibited\n");
-        return 0;
-    }
-
-    // 3 level pgtables
+PTE *map_page(uintptr_t va, pcb_t *pcb) {
+     // 3 level pgtables
     PTE *pt2 = (PTE *) pcb->pgdir;
     PTE *pt1 = NULL;
     PTE *pt0 = NULL;
@@ -137,16 +142,11 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
-    list_node_t *page_list;
-    if (pcb->type == TYPE_PROCESS)
-        page_list = &pcb->page_list;
-    else {
-        logging(LOG_DEBUG, "mm", "thread alloc page, use parent's page_list\n");
-        page_list = &get_parent(pcb->pid)->page_list;
-    }
+    list_node_t *page_list = get_page_list(pcb);
 
     logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
+    logging(LOG_VERBOSE, "mm", "... page_list=0x%x%x\n", (uint64_t)page_list>>32, (uint64_t)page_list);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
@@ -189,6 +189,18 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
 #endif
 
     logging(LOG_VERBOSE, "mm", "... pte at 0x%x%x\n", (uint64_t)pte>>32, (uint64_t)pte);
+    return pte;
+}
+
+uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
+    // NULL
+    if (va == 0) {
+        logging(LOG_ERROR, "mm", "alloc page for addr 0x0 is prohibited\n");
+        return 0;
+    }
+
+    list_node_t *page_list = get_page_list(pcb);
+    PTE *pte = map_page(va, pcb);
 
     // FIXME: conflict?
     if (*pte & _PAGE_PRESENT) {

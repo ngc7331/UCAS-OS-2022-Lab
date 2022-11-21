@@ -63,7 +63,7 @@ extern list_head onmem_list;
 #define ROUND(a, n)     (((((uint64_t)(a))+(n)-1)) & ~((n)-1))
 #define ROUNDDOWN(a, n) (((uint64_t)(a)) & ~((n)-1))
 
-extern ptr_t allocPage(int numPage);
+ptr_t allocPage(int numPage);
 page_t *alloc_page1(void);
 void free_page1(page_t *page);
 
@@ -74,15 +74,17 @@ void do_garbage_collector(void);
 #ifdef S_CORE
 #define LARGE_PAGE_FREEMEM 0xffffffc056000000
 #define USER_STACK_ADDR 0x400000
-extern ptr_t allocLargePage(int numPage);
+ptr_t allocLargePage(int numPage);
 #else
 // NOTE: A/C-core
 #define USER_STACK_ADDR 0xf00010000
 #endif
 
-extern void *kmalloc(size_t size);
-extern void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
-extern uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
+void *kmalloc(size_t size);
+void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
+list_node_t *get_page_list(pcb_t *pcb);
+PTE *map_page(uintptr_t va, pcb_t *pcb);
+uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
 
 // swap
 uintptr_t swap_out();
