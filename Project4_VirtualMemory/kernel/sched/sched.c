@@ -270,6 +270,7 @@ void do_scheduler(void) {
     // switch pagedir
     set_satp(SATP_MODE_SV39, next->pid, kva2pa(next->pgdir) >> NORMAL_PAGE_SHIFT);
     local_flush_tlb_all();
+    local_flush_icache_all();
 
     // switch_to current_running
     switch_to(prev, current_running[cid]);
