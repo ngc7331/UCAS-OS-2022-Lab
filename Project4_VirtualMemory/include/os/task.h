@@ -6,6 +6,9 @@
 #define APP_MAXNUM       64
 #define BATCH_MAXNUM     16
 
+#define TASK_NUM_LOC 0xffffffc0502001fa
+#define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
+
 // task type
 typedef enum {
     APP,

@@ -19,9 +19,6 @@
 #include <sys/syscall.h>
 #include <type.h>
 
-#define TASK_NUM_LOC 0xffffffc0502001fa
-#define TASK_INFO_P_LOC (TASK_NUM_LOC - 8)
-
 // tasks
 task_info_t apps[APP_MAXNUM];
 short appnum;

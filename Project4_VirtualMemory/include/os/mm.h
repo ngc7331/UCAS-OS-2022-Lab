@@ -57,7 +57,6 @@ typedef struct {
     } tp;
 } page_t;
 
-extern list_head freepage_list;
 extern list_head onmem_list;
 
 /* Rounding; only works for n = power of two */
