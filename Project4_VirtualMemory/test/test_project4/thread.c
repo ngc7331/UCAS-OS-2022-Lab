@@ -22,15 +22,15 @@ void worker(void *arg) {
 
     // add
     for (int i=0; i<STEP; i++) {
-        sys_move_cursor(0, print_location + self);
+        sys_move_cursor(0, print_location + self + 1);
         printf(">        thread#%d   : add (%d/%d), partsum=%d\n", self, i, STEP, sum);
         sum += arr[i+base];
     }
 
     // done
-    sys_move_cursor(0, print_location + self);
+    sys_move_cursor(0, print_location + self + 1);
     printf(blank);
-    sys_move_cursor(0, print_location + self);
+    sys_move_cursor(0, print_location + self + 1);
     printf(">        thread#%d   : done, sum=%d\n", self, sum);
 
     res[self] = sum;
