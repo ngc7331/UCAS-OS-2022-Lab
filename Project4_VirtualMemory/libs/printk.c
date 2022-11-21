@@ -298,6 +298,7 @@ int printl(const char *fmt, ...)
 #define ENABLE_LOGGING
 
 static loglevel_t __level = LOG_VERBOSE;
+static loglevel_t __print_level = LOG_ERROR;
 
 int logging(loglevel_t level, const char* name, const char *fmt, ...)
 {
@@ -328,11 +329,17 @@ int logging(loglevel_t level, const char* name, const char *fmt, ...)
     buf[ret++] = ' ';
     buf[ret] = '\0';
 
+    // print to log file
     bios_logging(buf);
-
     va_start(va, fmt);
     ret = vprintl(fmt, va);
     va_end(va);
+
+    // print to screen
+    if (level >= __print_level) {
+        screen_write(buf);
+        vprintk(fmt, va);
+    }
 
     return ret;
 #endif
