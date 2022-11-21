@@ -21,6 +21,7 @@ unsigned remaining_pf = PAGEFRAME_LIMIT;
 #define TASK_INFO_P_LOC 0xffffffc0502001f2
 
 LIST_HEAD(freepage_list);
+LIST_HEAD(freeswap_list);
 LIST_HEAD(onmem_list);
 
 ptr_t allocPage(int numPage)
@@ -78,6 +79,37 @@ void free_page1(page_t *page) {
             remaining_pf ++;
         logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
     }
+}
+
+unsigned int allocDBlock(int numBlock)
+{
+    static unsigned int diskptr = 0;  // block id
+    if (diskptr == 0)
+        diskptr = (*((long *) TASK_INFO_P_LOC) + (appnum + batchnum) * sizeof(task_info_t)) / SECTOR_SIZE + 1;
+    // align PAGE_SIZE
+    unsigned int ret = diskptr;
+    diskptr = ret + numBlock;
+    return ret;
+}
+
+swap_t *alloc_swap1(void) {
+    swap_t *swap;
+    if (!list_is_empty(&freeswap_list)) {
+        swap = list_entry(freeswap_list.next, swap_t, list);
+        list_delete(freeswap_list.next);
+        logging(LOG_DEBUG, "swap", "reuse sector at 0x%x\n", swap->pa);
+    } else {
+        swap = (swap_t *) kmalloc(sizeof(swap_t));
+        list_init(&swap->list);
+        swap->pa = allocDBlock(PAGE_SIZE / SECTOR_SIZE);
+        logging(LOG_DEBUG, "swap", "allocate new sector at 0x%x\n", swap->pa);
+    }
+    return swap;
+}
+
+void free_swap1(swap_t *swap) {
+    list_insert(&freeswap_list, &swap->list);
+    logging(LOG_DEBUG, "swap", "freed sector at 0x%x\n", swap->pa);
 }
 
 void *kmalloc(size_t size) {
@@ -229,22 +261,18 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
 // FIFO swap
 uintptr_t swap_out() {
     logging(LOG_INFO, "swap", "store page to disk\n");
-    // FIXME: space on disk is not reusable now
-    static unsigned int diskptr = 0;
-    if (diskptr == 0)
-        diskptr = (*((long *) TASK_INFO_P_LOC) + (appnum + batchnum) * sizeof(task_info_t)) / SECTOR_SIZE + 1;
-    // delete from onmem
     page_t *page = list_entry(onmem_list.next, page_t, onmem);
+    // alloc swap sector
+    page->swap = alloc_swap1();
+    // delete from onmem
     list_delete(onmem_list.next);
     logging(LOG_DEBUG, "swap", "... from 0x%x%x\n", page->kva>>32, page->kva);
     // set pfn & attr
     PTE *pte = get_pte_of(page->va, page->owner->pgdir, 0);
     set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) & ~_PAGE_PRESENT);
     // store to disk
-    bios_sdwrite(kva2pa(page->kva), PAGE_SIZE/SECTOR_SIZE, diskptr);
-    logging(LOG_DEBUG, "swap", "... pid=%d, va=%x%x, diskptr=%x\n", page->owner->pid, page->va>>32, page->va, diskptr);
-    page->swappa = diskptr;
-    diskptr += PAGE_SIZE/SECTOR_SIZE;
+    bios_sdwrite(kva2pa(page->kva), PAGE_SIZE/SECTOR_SIZE, page->swap->pa);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%x%x, diskptr=0x%x\n", page->owner->pid, page->va>>32, page->va, page->swap->pa);
     // reset kva
     uintptr_t kva = page->kva;
     page->kva = 0;
@@ -257,9 +285,11 @@ void swap_in(page_t *page, uintptr_t kva) {
     // reset kva
     page->kva = kva;
     // load from disk
-    bios_sdread(kva2pa(kva), PAGE_SIZE/SECTOR_SIZE, page->swappa);
-    logging(LOG_DEBUG, "swap", "... pid=%d, va=%x%x, diskptr=%x\n", page->owner->pid, page->va>>32, page->va, page->swappa);
-    page->swappa = 0;
+    bios_sdread(kva2pa(kva), PAGE_SIZE/SECTOR_SIZE, page->swap->pa);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%x%x, diskptr=0x%x\n", page->owner->pid, page->va>>32, page->va, page->swap->pa);
+    // free swap sector
+    free_swap1(page->swap);
+    page->swap = NULL;
     // set pfn & attr
     PTE *pte = get_pte_of(page->va, page->owner->pgdir, 4);
     set_pfn(pte, kva2pa(kva) >> NORMAL_PAGE_SHIFT);
@@ -276,7 +306,7 @@ page_t *check_and_swap(pcb_t *pcb, uintptr_t va) {
         if (page->va != (va & ~(PAGE_SIZE-1))) {
             continue;
         }
-        if (page->swappa == 0) {
+        if (page->swap == NULL) {
             if (page->tp != PAGE_USER)
                 continue;
             logging(LOG_ERROR, "swap", "page record found, but not on disk, kva=0x%x%x\n", page->kva>>32, page->kva);

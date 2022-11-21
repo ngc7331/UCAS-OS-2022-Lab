@@ -38,12 +38,16 @@
 #define INIT_KERNEL_STACK 0xffffffc052000000
 #define FREEMEM_KERNEL (INIT_KERNEL_STACK+4*PAGE_SIZE)
 
-#define MAX_PAGENUM 1024
+typedef struct {
+    unsigned int pa; // block id
+    list_node_t list;
+} swap_t;
+
 typedef struct {
     ptr_t kva;
     ptr_t va;
-    unsigned int swappa;
     list_node_t list;
+    swap_t *swap;
     list_node_t onmem;
     pcb_t *owner;
     int ref;
