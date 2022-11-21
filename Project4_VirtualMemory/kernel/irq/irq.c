@@ -47,13 +47,18 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
 
     // get pte
     PTE *pte = get_pte_of(stval, current_running[cid]->pgdir, 0);
-    // if not present, alloc a new page for badaddr
+    // pte not present
     if (pte == NULL) {
-        if (check_and_swap(current_running[cid], stval) == NULL)
-            alloc_page_helper(stval, current_running[cid]);
+        // check if it's on disk
+        if (check_and_swap(current_running[cid], stval) == NULL) {
+            // not on disk, try to alloc a new page
+            if (alloc_page_helper(stval, current_running[cid]) == 0) {
+                // failed to alloc, kill current_running
+                printk("kernel panic: alloc page failed\n");
+                do_exit();
+            }
+        }
         pte = get_pte_of(stval, current_running[cid]->pgdir, 0);
-    } else {
-        logging(LOG_CRITICAL, "test", "else\n");
     }
     // set attribute
     if (code == EXCC_LOAD_PAGE_FAULT) {

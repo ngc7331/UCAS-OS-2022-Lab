@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <os/mm.h>
 #include <os/pthread.h>
 #include <os/string.h>
@@ -120,6 +121,12 @@ void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir) {
    return the kernel virtual address for the page
    */
 uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
+    // NULL
+    if (va == 0) {
+        logging(LOG_ERROR, "mm", "alloc page for addr 0x0 is prohibited\n");
+        return 0;
+    }
+
     // 3 level pgtables
     PTE *pt2 = (PTE *) pcb->pgdir;
     PTE *pt1 = NULL;
