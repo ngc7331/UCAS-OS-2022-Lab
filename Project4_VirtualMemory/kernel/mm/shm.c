@@ -1,5 +1,6 @@
 #include <os/mm.h>
 #include <os/smp.h>
+#include <os/string.h>
 #include <printk.h>
 
 #define SHM_PAGE_BASE 0x80000000

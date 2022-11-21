@@ -55,6 +55,7 @@ page_t *alloc_page1(void) {
         page->tp = PAGE_KERNEL;
         logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
+    memset((void *) page->kva, 0, PAGE_SIZE);
     return page;
 }
 
@@ -67,7 +68,6 @@ void free_page1(page_t *page) {
     page->owner = NULL;
     if (page->tp == PAGE_USER)
         remaining_pf ++;
-    memset((void *)page->kva, 0, PAGE_SIZE);
     logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
 }
 
