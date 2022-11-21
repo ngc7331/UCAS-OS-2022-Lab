@@ -1,11 +1,10 @@
 #include <os/kernel.h>
 #include <os/mm.h>
-#include <os/task.h>
 #include <os/pthread.h>
-#include <printk.h>
+#include <os/string.h>
+#include <os/task.h>
 #include <pgtable.h>
-
-#include <assert.h>
+#include <printk.h>
 
 // NOTE: A/C-core
 static ptr_t kernMemCurr = FREEMEM_KERNEL;
@@ -77,6 +76,7 @@ void free_page1(page_t *page) {
         page->owner = NULL;
         if (page->tp == PAGE_USER)
             remaining_pf ++;
+        memset((void *)page->kva, 0, PAGE_SIZE);
         logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
     }
 }
