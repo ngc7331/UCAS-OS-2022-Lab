@@ -2,7 +2,6 @@
 #include <os/mm.h>
 #include <os/pthread.h>
 #include <os/string.h>
-#include <pgtable.h>
 #include <printk.h>
 
 // NOTE: A/C-core
@@ -45,7 +44,6 @@ page_t *alloc_page1(void) {
         page->va = 0;
         list_delete(freepage_list.next);
         list_delete(&page->onmem);
-        page->ref ++;
         page->tp = PAGE_KERNEL;
         logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
     } else {
@@ -54,7 +52,6 @@ page_t *alloc_page1(void) {
         page->va = 0;
         list_init(&page->list);
         list_init(&page->onmem);
-        page->ref = 1;
         page->tp = PAGE_KERNEL;
         logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
@@ -62,18 +59,16 @@ page_t *alloc_page1(void) {
 }
 
 void free_page1(page_t *page) {
-    if (--page->ref <= 0) {
-        list_delete(&page->list);
-        if (page->kva == 0) // not on memory
-            return ;
-        list_delete(&page->onmem);
-        list_insert(&freepage_list, &page->list);
-        page->owner = NULL;
-        if (page->tp == PAGE_USER)
-            remaining_pf ++;
-        memset((void *)page->kva, 0, PAGE_SIZE);
-        logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
-    }
+    list_delete(&page->list);
+    if (page->kva == 0) // not on memory
+        return ;
+    list_delete(&page->onmem);
+    list_insert(&freepage_list, &page->list);
+    page->owner = NULL;
+    if (page->tp == PAGE_USER)
+        remaining_pf ++;
+    memset((void *)page->kva, 0, PAGE_SIZE);
+    logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
 }
 
 void *kmalloc(size_t size) {
@@ -131,9 +126,9 @@ list_node_t *get_page_list(pcb_t *pcb) {
 /* allocate physical page for `va`, mapping it into `pcb->pgdir`,
    return the kernel virtual address for the page
    */
-PTE *map_page(uintptr_t va, pcb_t *pcb) {
+PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list) {
      // 3 level pgtables
-    PTE *pt2 = (PTE *) pcb->pgdir;
+    PTE *pt2 = (PTE *) pgdir;
     PTE *pt1 = NULL;
     PTE *pt0 = NULL;
 
@@ -142,9 +137,7 @@ PTE *map_page(uintptr_t va, pcb_t *pcb) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
-    list_node_t *page_list = get_page_list(pcb);
-
-    logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
+    logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pgdir>>32, pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
     logging(LOG_VERBOSE, "mm", "... page_list=0x%x%x\n", (uint64_t)page_list>>32, (uint64_t)page_list);
 
@@ -152,7 +145,8 @@ PTE *map_page(uintptr_t va, pcb_t *pcb) {
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
         page_t *tmp = alloc_page1();
-        list_insert(page_list, &tmp->list);
+        if (page_list != NULL)
+            list_insert(page_list, &tmp->list);
         uintptr_t page = tmp->kva;
         set_pfn(&pt2[vpn2], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt2[vpn2], _PAGE_PRESENT);
@@ -172,7 +166,8 @@ PTE *map_page(uintptr_t va, pcb_t *pcb) {
     if (!(pt1[vpn1] & _PAGE_PRESENT)) {
         // alloc a new second-level page directory
         page_t *tmp = alloc_page1();
-        list_insert(page_list, &tmp->list);
+        if (page_list != NULL)
+            list_insert(page_list, &tmp->list);
         uintptr_t page = tmp->kva;
         set_pfn(&pt1[vpn1], kva2pa(page) >> NORMAL_PAGE_SHIFT);
         set_attribute(&pt1[vpn1], _PAGE_PRESENT);
@@ -200,7 +195,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     }
 
     list_node_t *page_list = get_page_list(pcb);
-    PTE *pte = map_page(va, pcb);
+    PTE *pte = map_page(va, pcb->pgdir, &pcb->page_list);
 
     // FIXME: conflict?
     if (*pte & _PAGE_PRESENT) {
@@ -218,7 +213,6 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         tmp->kva = swap_out();
         list_init(&tmp->list);
         list_init(&tmp->onmem);
-        tmp->ref = 1;
     } else {
         remaining_pf --;
         tmp = alloc_page1();

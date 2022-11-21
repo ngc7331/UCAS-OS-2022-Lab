@@ -50,10 +50,10 @@ typedef struct {
     swap_t *swap;
     list_node_t onmem;
     pcb_t *owner;
-    int ref;
     enum {
         PAGE_USER,
-        PAGE_KERNEL
+        PAGE_KERNEL,
+        PAGE_SHM
     } tp;
 } page_t;
 
@@ -83,7 +83,7 @@ ptr_t allocLargePage(int numPage);
 void *kmalloc(size_t size);
 void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
 list_node_t *get_page_list(pcb_t *pcb);
-PTE *map_page(uintptr_t va, pcb_t *pcb);
+PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list);
 uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
 
 // swap
@@ -91,7 +91,21 @@ uintptr_t swap_out();
 void swap_in(page_t *page, uintptr_t kva);
 page_t *check_and_swap(pcb_t *pcb, uintptr_t va);
 
-// TODO [P4-task5]: shm_page_get/dt */
+// shm_page
+#define SHM_PAGE_MAX_REF 16
+typedef struct {
+    int key;
+    page_t *page;
+    struct {
+        // identifier
+        pid_t pid;
+        // va for user
+        uint64_t va;
+    } map[SHM_PAGE_MAX_REF];
+    int ref;
+} shm_page_t;
+
+void init_shm_pages();
 uintptr_t shm_page_get(int key);
 void shm_page_dt(uintptr_t addr);
 
