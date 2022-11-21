@@ -64,6 +64,9 @@ pid_t pthread_create(uint64_t entrypoint, void *arg) {
     // find parent
     pcb_t *parent = get_parent(current_running[cid]->pid);
 
+    // init page_list but never use (use parent's instead)
+    list_init(&pcb[idx].page_list);
+
     // allocate a new pgdir and copy from kernel
     pcb[idx].pgdir = parent->pgdir;
 
@@ -102,7 +105,7 @@ int pthread_join(pid_t tid) {
     int cid = get_current_cpu_id();
     int retval = 0;
     logging(LOG_INFO, "scheduler", "%d.%s.%d join tid=%d\n",
-            current_running[cid]->pid, current_running[cid]->name, tid);
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, tid);
     for (int i=0; i<NUM_MAX_TASK; i++) {
         if (pcb[i].status == TASK_UNUSED)
             break;

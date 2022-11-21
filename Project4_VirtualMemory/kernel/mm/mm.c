@@ -100,7 +100,7 @@ void do_garbage_collector(void) {
     for (int i=0; i<NUM_MAX_TASK; i++) {
         if (pcb[i].status == TASK_UNUSED)
             break;
-        if (pcb[i].status != TASK_EXITED)
+        if (pcb[i].status != TASK_EXITED || pcb[i].type != TYPE_PROCESS)
             continue;
         while (!list_is_empty(&pcb[i].page_list)) {
             free_page1(list_entry(pcb[i].page_list.next, page_t, list));
