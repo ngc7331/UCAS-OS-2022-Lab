@@ -183,10 +183,6 @@ int main(void) {
         init_jmptab();
         logging(LOG_INFO, "init", "Jump table initialization succeeded.\n");
 
-        // FIXME: when to? upmap boot address
-        // unmap_boot_addr();
-        // logging(LOG_INFO, "init", "Unmapped boot address[0x50000000, 0x54000000)\n");
-
         // Init task information (〃'▽'〃)
         init_task_info();
         logging(LOG_INFO, "init", "Task info loaded, apps=%d, batches=%d.\n", appnum, batchnum);
@@ -236,6 +232,10 @@ int main(void) {
         wakeup_other_hart();
     } else {
         // for slave core
+        // FIXME: when to? upmap boot address
+        unmap_boot_addr();
+        logging(LOG_INFO, "init", "Unmapped boot address[0x50000000, 0x54000000)\n");
+
         // init pcb
         init_pid0_pcb();
         logging(LOG_INFO, "init", "PID0_PCB initialization succeeded.\n");
