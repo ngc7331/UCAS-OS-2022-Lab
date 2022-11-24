@@ -41,20 +41,20 @@ page_t *alloc_page1(void) {
     page_t *page;
     if (!list_is_empty(&freepage_list)) {
         page = list_entry(freepage_list.next, page_t, list);
-        page->va = 0;
         list_delete(freepage_list.next);
         list_delete(&page->onmem);
-        page->tp = PAGE_KERNEL;
         logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
-        page->va = 0;
         list_init(&page->list);
         list_init(&page->onmem);
-        page->tp = PAGE_KERNEL;
         logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
     }
+    page->tp = PAGE_KERNEL;
+    page->va = 0;
+    page->swap = NULL;
+    page->owner = NULL;
     memset((void *) page->kva, 0, PAGE_SIZE);
     return page;
 }
@@ -213,11 +213,13 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
         tmp->kva = swap_out();
         list_init(&tmp->list);
         list_init(&tmp->onmem);
+        memset((void *) tmp->kva, 0, PAGE_SIZE);
     } else {
         remaining_pf --;
         tmp = alloc_page1();
     }
     tmp->tp = PAGE_USER;
+    tmp->swap = NULL;
     list_insert(onmem_list.prev, &tmp->onmem);
     list_insert(page_list, &tmp->list);
     tmp->owner = pcb;
