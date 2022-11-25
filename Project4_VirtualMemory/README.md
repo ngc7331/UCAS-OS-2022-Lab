@@ -21,11 +21,11 @@
       - [`swap_t` 结构](#swap_t-结构)
       - [`swap_out()` / `swap_in()`](#swap_out--swap_in)
       - [`check_and_swap()`](#check_and_swap)
-  - [用户程序](#用户程序)
-    - [对 exec 的修改](#对-exec-的修改)
-    - [对 loader 的修改](#对-loader-的修改)
-    - [对 scheduler 的修改](#对-scheduler-的修改)
-    - [缺页异常的处理](#缺页异常的处理)
+  - [运行用户程序](#运行用户程序)
+    - [创建：对 exec 的修改](#创建对-exec-的修改)
+    - [载入：对 loader 的修改](#载入对-loader-的修改)
+    - [调度：对 scheduler 的修改](#调度对-scheduler-的修改)
+    - [缺页异常的处理：`handle_page_fault()`](#缺页异常的处理handle_page_fault)
     - [用户地址空间示意](#用户地址空间示意)
   - [线程](#线程)
   - [共享页](#共享页)
@@ -190,14 +190,39 @@ in：
 
 根据 FIFO 策略换出一个页（释放一个页框），并将刚刚找到的页换入
 
-## 用户程序
-### 对 exec 的修改
+## 运行用户程序
+### 创建：对 exec 的修改
+1. [检查并回收垃圾](#do_garbage_collector)
+2. 遍历 pcb 数组找到一个未使用（`TASK_UNUSED`或`TASK_EXITED`）的项
+3. 分配页目录，从内核复制页表项（以便系统调用/异常时无需切换页表）
+4. 每次`alloc_page_helper()`分配一个用户态页，并`load_img()`读取一个页的内容，直至用户程序载入完成
+5. `alloc_page1()`分配一个内核栈的页，设置内核栈指针为分配的 kva
+6. `alloc_page_helper()`分配一个用户栈的页，记录分配的 kva 用于复制参数，设置用户栈指针为固定值`USER_STACK_ADDR`
+7. 其余类似 Project 3
 
-### 对 loader 的修改
+2~5步分配出的所有页均被连接在 pcb 的 `page_list` 中，以便回收
 
-### 对 scheduler 的修改
+### 载入：对 loader 的修改
+首先，各用户程序间是隔离的，不能像[以前](../Project1_BootLoader/README.md#取消应用程序间的-padding)一样直接将用户程序载入到`memaddr+offset`处再向前移动（可能刚好由于offset的存在超出了分配给用户程序的页，造成其它进程的页被覆盖而出错）
 
-### 缺页异常的处理
+因此使用`allocPage()`直接分配一大块内存空间作为 buffer，`bios_sdread()`到 buffer 中，再复制需要的部分到分配给用户程序的页中
+
+其次，根据学案提示，一次`bios_sdread()`不应超过64个扇区，因此使用一个循环，若剩余大于64个扇区，则仅读入和复制64个扇区，将目标地址`memaddr`、读取位置`block_id`后移，剩余大小`num_of_blocks`、`size`减小，重置`offset`
+
+最后，由于该函数也被用于读取 taskinfo 数组，这一读取行为后由调用者将数据复制到正确的地方，因此在函数内无需进行复制，只需返回 buffer 的地址即可。将这种用法封装为`load_img_tmp()`函数以便使用
+
+### 调度：对 scheduler 的修改
+在`switch_to`之前，切换页目录并刷新硬件
+
+### 缺页异常的处理：`handle_page_fault()`
+将12、13、15三个异常号，即取指页错误、读取页错误、写入页错误3种异常连接到该函数上
+1. 检查va对应的页表项
+2. 若不存在：
+   1. [检查并换入在硬盘上的页](#check_and_swap)
+   2. 不在硬盘上，[分配新页](#alloc_page_helper)
+3. 若存在，是否是只读页产生的写入页错误，若是（一定是[快照](#快照)）：
+   1. [分配新页](#alloc_page_helper)，将旧页的内容复制到新页
+4. 根据异常类型置页表项的 A / D 位
 
 ### 用户地址空间示意
 ```
