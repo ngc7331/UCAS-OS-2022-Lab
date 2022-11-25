@@ -28,6 +28,8 @@ void interrupt_helper(regs_context_t *regs, uint64_t stval, uint64_t scause)
         handler = exc_table[code];
     }
     handler(regs, stval, scause);
+    local_flush_tlb_all();
+    local_flush_icache_all();
 }
 
 void handle_irq_timer(regs_context_t *regs, uint64_t stval, uint64_t scause)
@@ -66,11 +68,7 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
     } else if (code == EXCC_STORE_PAGE_FAULT) {
         set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) | _PAGE_ACCESSED | _PAGE_DIRTY);
     }
-    // reflush hardware
-    local_flush_tlb_all();
-    if (code == EXCC_INST_PAGE_FAULT) {
-        local_flush_icache_all();
-    }
+    // reflush hardware in interrupt_helper()
 }
 
 void init_exception()
