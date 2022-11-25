@@ -28,8 +28,19 @@
     - [缺页异常的处理：`handle_page_fault()`](#缺页异常的处理handle_page_fault)
     - [用户地址空间示意](#用户地址空间示意)
   - [线程](#线程)
+    - [`pthread_create()`](#pthread_create)
+    - [`pthread_join()`](#pthread_join)
+    - [`pthread_exit()`](#pthread_exit)
   - [共享页](#共享页)
+    - [`shm_page_get()`](#shm_page_get)
+    - [`shm_page_dt()`](#shm_page_dt)
   - [快照](#快照)
+    - [`do_snapshot()`](#do_snapshot)
+  - [测试程序](#测试程序)
+    - [thread](#thread)
+    - [test](#test)
+    - [swap](#swap-1)
+    - [snapshot](#snapshot)
   - [一个 bug 的调试历程](#一个-bug-的调试历程)
     - [已知复现方法](#已知复现方法)
     - [已知信息](#已知信息)
@@ -140,7 +151,7 @@
 #### `alloc_page_helper()`
 用于分配用户态的页、分配页表并建立页表项，同时负责将页连接到进程持有的页列表中
 
-其中“分配页表并建立页表项”是通过独立封装的`map_page()`函数实现，这么做是为了 snapshot 等功能可以复用代码
+其中“分配页表并建立页表项”是通过独立封装的`map_page()`函数实现，这么做是为了 [snapshot](#快照) 等功能可以复用代码
 
 所有页都是通过 [`alloc_page1()`](#alloc_page1) 分配
 
@@ -243,10 +254,114 @@ in：
 ```
 
 ## 线程
+复用 pcb 结构，同进程一样调度
+### `pthread_create()`
+类似进程的`do_exec()`，差异主要在于
+1. 分配新的 tid，继承 pid
+2. 不使用自身的 `page_list`，所有页连接在父进程的 `page_list` 中
+3. 使用父进程的页目录和页表
+4. 不载入用户程序
+5. 只通过 a0 寄存器传递一个参数`void *arg`
+6. 入口地址为用户程序传入的函数地址
+
+### `pthread_join()`
+类似进程的`do_waitpid()`
+
+### `pthread_exit()`
+类似进程的`do_exit()`
+
+需要用户程序（的线程）主动在 return 前调用
 
 ## 共享页
+类似锁、条件变量等，将共享页作为系统资源分配
+
+一个共享页仅允许同时被`SHM_PAGE_MAX_REF`个进程获取，系统中最大只能存在`SHM_PAGE_NUM`个共享页
+
+采用类似引用计数法的思路，当 ref 归零时回收共享页
+
+### `shm_page_get()`
+1. 从`SHM_PAGE_BASE`开始搜索用户虚地址空间，最大只能搜索到`SHM_PAGE_LIM`，找到用户未使用（页表项不存在）的虚地址，作为用户访问共享页的虚地址。如果没有可用的用户虚地址，则失败
+2. 类似锁、条件变量等，分配一个共享页，若没有可用的，或 key 匹配但 ref 超出`SHM_PAGE_MAX_REF`则失败
+3. `ref ++`
+4. 若共享页未被绑定在某一物理页框上，调用`alloc_page1()`分配（该函数保证分配的页内容为全0）
+5. 将调用者的 pid 和 va 记录在 map 域中
+6. 设置页表项
+
+### `shm_page_dt()`
+1. 遍历所有共享页，找到 pid 和 addr 同时匹配的项
+2. `ref --`
+3. 将调用者的信息从 map 中移除
+4. 无效页表项
+5. 若 ref 归零，调用`free_page1()`回收绑定的页
 
 ## 快照
+写时复制已经在[缺页异常的处理](#缺页异常的处理handle_page_fault)中完成，只需完成创建快照即可
+### `do_snapshot()`
+1. 将传入的`va`向下对齐到页便于后续处理
+2. 设置`va`对应的页表项为不可写
+3. 类似共享页，从`va`开始搜索用户虚地址空间，最大搜索到`va+SNAPSHOT_LIM`，找到用户未使用（页表项不存在）的虚地址，作为用户访问快照的虚地址`new_va`
+4. 调用`map_page()`创建`new_va`的页目录
+5. 设置页表项，其指向`va`对应的页，但属性为可写
+6. 返回`new_va`
+
+## 测试程序
+### thread
+除了老师使用的 mailbox 外，还使用了 Project 2 使用的 thread 测试程序，用以测试`pthread_join()`和`pthread_exit()`的工作情况
+
+输出类似：
+```
+> [TASK] main thread: waiting for thread#0
+>        thread#0   : add (328/500), partsum=53956
+>        thread#1   : add (310/500), partsum=203205
+>        thread#2   : add (298/500), partsum=342551
+>        thread#3   : add (291/500), partsum=478986
+
+> root@UCAS_OS: exec thread
+```
+
+### test
+测试内核对`0x0`地址的保护（不允许访问`NULL`）
+
+输出类似：
+```
+[0][00000000000565243650][mm        ][E] alloc page for addr 0x0 is prohibited
+kernel panic: alloc page failed
+
+> root@UCAS_OS: exec test
+```
+
+### swap
+测试换出/入页，连续写入`ACCESS_NUM`个页，随后读取这些页，校验数据和写入一致
+
+输出类似：
+```
+write................................
+read ................................Success!
+
+> root@UCAS_OS: exec swap
+```
+每一个`.`表示一次写入/读取
+
+### snapshot
+测试快照，创建10次快照，每次有一半的概率写入一个新值
+
+输出类似：
+```
+snapshot[0] @ 0x10001000: 0x114514 @ 0x52020000
+snapshot[1] @ 0x10002000: 0x114515 @ 0x52021000
+snapshot[2] @ 0x10003000: 0x114515 @ 0x52021000
+snapshot[3] @ 0x10004000: 0x114515 @ 0x52021000
+snapshot[4] @ 0x10005000: 0x114518 @ 0x52022000
+snapshot[5] @ 0x10006000: 0x114518 @ 0x52022000
+snapshot[6] @ 0x10007000: 0x114518 @ 0x52022000
+snapshot[7] @ 0x10008000: 0x114518 @ 0x52022000
+snapshot[8] @ 0x10009000: 0x114518 @ 0x52022000
+snapshot[9] @ 0x1000a000: 0x114518 @ 0x52022000
+base        @ 0x10000000: 0x11451e @ 0x52023000
+
+> root@UCAS_OS: exec snapshot
+```
+输出格式为`快照次数 @ 用户虚地址: 值 @ 物理地址`
 
 ## 一个 bug 的调试历程
 在本次 A/C-Core 的调试过程中，遇到了一个很头疼的 bug，特此记录
