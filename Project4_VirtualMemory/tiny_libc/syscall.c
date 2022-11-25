@@ -266,3 +266,11 @@ void *sys_shmpageget(int key) {
 void sys_shmpagedt(void *addr) {
     invoke_syscall(SYSCALL_SHM_DT, (long) addr, IGNORE, IGNORE, IGNORE, IGNORE);
 }
+
+uint64_t sys_snapshot(uint64_t va) {
+    return invoke_syscall(SYSCALL_SNAPSHOT, va, IGNORE, IGNORE, IGNORE, IGNORE);
+}
+
+uint64_t sys_getpa(uint64_t va) {
+    return invoke_syscall(SYSCALL_GETPA, va, IGNORE, IGNORE, IGNORE, IGNORE);
+}

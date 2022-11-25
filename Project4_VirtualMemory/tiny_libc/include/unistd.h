@@ -80,9 +80,12 @@ int sys_mbox_recv(int mbox_idx, void *msg, int msg_length);
 /* smp */
 void sys_taskset(pid_t pid, unsigned mask);
 
-/* TODO: [P4-task5] shmpageget/dt */
 /* shmpageget/dt */
-void* sys_shmpageget(int key);
+void *sys_shmpageget(int key);
 void sys_shmpagedt(void *addr);
+
+/* snapshot */
+uint64_t sys_snapshot(uint64_t va);
+uint64_t sys_getpa(uint64_t va);
 
 #endif
