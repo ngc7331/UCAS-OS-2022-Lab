@@ -61,11 +61,12 @@ page_t *alloc_page1(void) {
 
 void free_page1(page_t *page) {
     list_delete(&page->list);
-    if (page->kva == 0) // not on memory
+    if (page->kva == 0) { // not on memory
+        free_swap1(page->swap);
         return ;
+    }
     list_delete(&page->onmem);
     list_insert(&freepage_list, &page->list);
-    page->owner = NULL;
     if (page->tp == PAGE_USER)
         remaining_pf ++;
     logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
@@ -196,12 +197,6 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
 
     list_node_t *page_list = get_page_list(pcb);
     PTE *pte = map_page(va, pcb->pgdir, &pcb->page_list);
-
-    // FIXME: conflict?
-    if (*pte & _PAGE_PRESENT) {
-        logging(LOG_WARNING, "mm", "va 0x%x%x already in pgdir %x%x\n", va>>32, va, pcb->pgdir>>32, pcb->pgdir);
-        return 0;
-    }
 
     // allocate a new page for va
 #ifdef S_CORE

@@ -87,6 +87,7 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list);
 uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
 
 // swap
+void free_swap1(swap_t *swap);
 uintptr_t swap_out();
 void swap_in(page_t *page, uintptr_t kva);
 page_t *check_and_swap(pcb_t *pcb, uintptr_t va);
@@ -108,5 +109,9 @@ typedef struct {
 void init_shm_pages();
 uintptr_t shm_page_get(int key);
 void shm_page_dt(uintptr_t addr);
+
+// snapshot
+uint64_t do_snapshot(uint64_t va);
+uint64_t do_getpa(uint64_t va);
 
 #endif /* MM_H */
