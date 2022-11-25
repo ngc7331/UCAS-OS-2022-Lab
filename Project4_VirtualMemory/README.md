@@ -9,15 +9,27 @@
     - [对原先 main.c 的修改](#对原先-mainc-的修改)
     - [实地址空间示意](#实地址空间示意)
   - [内存管理](#内存管理)
+    - [`page_t` 结构](#page_t-结构)
     - [页分配](#页分配)
+      - [`allocPage()`](#allocpage)
+      - [`alloc_page1()`](#alloc_page1)
+      - [`alloc_page_helper()`](#alloc_page_helper)
     - [页回收](#页回收)
+      - [`free_page1()`](#free_page1)
+      - [`do_garbage_collector()`](#do_garbage_collector)
     - [swap](#swap)
+      - [`swap_t` 结构](#swap_t-结构)
+      - [`swap_out()` / `swap_in()`](#swap_out--swap_in)
+      - [`check_and_swap()`](#check_and_swap)
   - [用户程序](#用户程序)
     - [对 exec 的修改](#对-exec-的修改)
     - [对 loader 的修改](#对-loader-的修改)
     - [对 scheduler 的修改](#对-scheduler-的修改)
     - [缺页异常的处理](#缺页异常的处理)
     - [用户地址空间示意](#用户地址空间示意)
+  - [线程](#线程)
+  - [共享页](#共享页)
+  - [快照](#快照)
   - [一个 bug 的调试历程](#一个-bug-的调试历程)
     - [已知复现方法](#已知复现方法)
     - [已知信息](#已知信息)
@@ -77,11 +89,106 @@
 ```
 
 ## 内存管理
+### `page_t` 结构
+使用 `page_t` 结构来描述一个页，其各域：
+- `ptr_t kva`：内核虚地址，当页在硬盘上时为0，当页在内存上时有效，且对应唯一的一个物理地址，此时可用于描述一个物理页框
+- `ptr_t va`：用户虚地址，如果页由内核使用则为0
+- `list_node_t list`：链表结点，连接在持有者的页链表中，用于[回收](#do_garbage_collector)时遍历并[释放](#free_page1)
+- `swap_t *swap`：[指向一个磁盘页](#swap_t-结构)，当页在内存上时为NULL，当页在磁盘上时有效
+- `list_node_t onmem`：链表结点，连接在内存页链表（FIFO）中，用于[换页](#swap)
+- `pcb_t *owner`：指向持有者
+- `enum { PAGE_USER, PAGE_KERNEL, PAGE_SHM } tp;`：页类型：用户页、内核页、共享用户页
+
+从某种角度上，可以认为一个 `page_t` 结构可以动态地绑定到一个物理页框或者一个磁盘区域上，同时绑定到一个进程的pcb上
+```
+---------       ----------        ----------
+|       |  kva  |        |        |        |
+| page  | <---> | page_t | *swap  | swap_t |
+| frame |       |        | <----> |        |
+|       |       |        |        |        |
+---------       ----------        ----------
+                    ^
+                    | *owner, list, va
+                    v
+                ----------
+                |        |
+                | pcb_t  |
+                |        |
+                ----------
+```
+- 当它未被分配时：位于`freepage_list` 中，仅 kva 有效，此时表示一个物理页框
+- 当它已被分配时：
+  - 位于内存中，kva，owner 等域有效，既表示一个虚页，也表示它对应的物理页框
+  - 位于硬盘中，swap，owner 等域有效，表示一个虚页
+
 ### 页分配
+分配内存总共经过3层封装，从底层向上：
+#### `allocPage()`
+这一层可以一次分配多个连续的页，仅会将空闲空间指针`kernMemCurr`上移`num`个页大小，并返回原值
+
+通过这层分配的空间是不可回收的，在内核实现中仅用在了`kmalloc()`、`alloc_page1()`和 loader 的缓冲区分配3处
+
+#### `alloc_page1()`
+1. 检查空闲页列表`freepage_list`是否有页，若有则取出一页。否则创建一页（利用 kmalloc 创建一个 page_t 结构）并初始化
+2. 初始化各域
+3. 调用`memset`清空页的原始内容
+
+一次仅能分配一个页，且不保证连续两次调用分配的页地址连续
+
+通过 [`free_page1()`](#free_page1) 回收
+
+#### `alloc_page_helper()`
+用于分配用户态的页、分配页表并建立页表项，同时负责将页连接到进程持有的页列表中
+
+其中“分配页表并建立页表项”是通过独立封装的`map_page()`函数实现，这么做是为了 snapshot 等功能可以复用代码
+
+所有页都是通过 [`alloc_page1()`](#alloc_page1) 分配
 
 ### 页回收
+#### `free_page1()`
+- 若页在内存中，将其加入空闲页列表`freepage_list`
+  - 若页是用户页，`remaining_pf+1`（见 [swap](#swap) 一节）
+- 若页在硬盘上，将其对应的`swap_t`结构体释放（调用`free_swap1()`函数）
+
+#### `do_garbage_collector()`
+遍历所有 pcb，找到状态处于`TASK_EXITED`的，遍历它们的持有页列表`page_list`并调用`free_page1()`进行回收
+
+为了避免过早的回收内核页导致出错（e.g.在`do_exit()`过程中，运行栈仍在内核页上），在`do_exec()`的开头调用该函数，而不是`do_kill()`的末尾
 
 ### swap
+通过`remaining_pf`计数器模拟内存限制，仅对用户态的页进行计数和换入/换出，避免内核态的页被换出导致出现
+
+由于所有用户态的页通过`alloc_page_helper()`分配，因此在该函数中，当新分配了页时将`remaining_pf-1`
+
+#### `swap_t` 结构
+使用 `page_t` 结构来描述一个硬盘区域，其各域：
+- `unsigned int pa`：所在的硬盘分区号（连续的`8=PAGE_SIZE/SECTOR_SIZE`个分区中第一个的分区号）
+- `list_node_t list`：链表结点，连接在空闲硬盘链表`freeswap_list`中（或指向它自身）
+
+使用类似[页](#内存管理)的方式通过`allocDBlock()`、`alloc_swap1()`、`free_swap1()`进行底层分配、分配和回收
+
+`allocDBlock()`分配的起始地址为 `taskinfo` 数组末尾向后对齐一个扇区处
+
+#### `swap_out()` / `swap_in()`
+两者基本是逆过程，out：
+1. 分配一个 `swap_t` 结构
+2. 将页从内存页列表`onmem_list`中删除
+3. 设置页表项为无效
+4. 写入磁盘
+5. 解除与页框的绑定
+6. 返回释放的页框（对应的内核虚地址`kva`）
+
+in：
+1. 绑定页框
+2. 读取磁盘
+3. 设置页表项为有效
+4. 将页加入内存页列表`onmem_list`
+5. 回收 `swap_t` 结构
+
+#### `check_and_swap()`
+遍历一个进程持有的所有页，找到位于磁盘上、va 所在的用户态的页
+
+根据 FIFO 策略换出一个页（释放一个页框），并将刚刚找到的页换入
 
 ## 用户程序
 ### 对 exec 的修改
@@ -109,6 +216,12 @@
                 ... (reserved)
 0x000000000 ---------------------------- <- NULL
 ```
+
+## 线程
+
+## 共享页
+
+## 快照
 
 ## 一个 bug 的调试历程
 在本次 A/C-Core 的调试过程中，遇到了一个很头疼的 bug，特此记录
