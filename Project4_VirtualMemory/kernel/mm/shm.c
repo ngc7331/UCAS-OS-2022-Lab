@@ -4,7 +4,7 @@
 #include <printk.h>
 
 #define SHM_PAGE_BASE 0x80000000
-#define SHM_PAGE_LIM (SHM_PAGE_BASE) + 0x1000 * PAGE_SIZE
+#define SHM_PAGE_LIM ((SHM_PAGE_BASE) + 0x1000 * PAGE_SIZE)
 #define SHM_PAGE_NUM 64
 
 shm_page_t shm_pages[SHM_PAGE_NUM];
