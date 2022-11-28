@@ -88,4 +88,8 @@ void sys_shmpagedt(void *addr);
 uint64_t sys_snapshot(uint64_t va);
 uint64_t sys_getpa(uint64_t va);
 
+/* net send and recv */
+int sys_net_send(void *txpacket, int length);
+int sys_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens);
+
 #endif

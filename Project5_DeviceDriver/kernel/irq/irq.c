@@ -77,6 +77,12 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
     // reflush hardware in interrupt_helper()
 }
 
+void handle_irq_ext(regs_context_t *regs, uint64_t stval, uint64_t scause)
+{
+    // TODO: [p5-task4] external interrupt handler.
+    // Note: plic_claim and plic_complete will be helpful ...
+}
+
 void init_exception()
 {
     /* initialize exc_table

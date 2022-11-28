@@ -235,6 +235,8 @@ void do_scheduler(void) {
     // Check sleep queue to wake up PCBs
     check_sleeping();
 
+    // TODO: [p5-task3] Check send/recv queue to unblock PCBs
+
     pcb_t *prev = current_running[cid];
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);
     if (next == NULL) {

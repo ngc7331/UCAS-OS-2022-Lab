@@ -74,12 +74,21 @@ static unsigned int mini_itoa(
 
     /* This builds the string back to front ... */
     do {
-        int digit = value % radix;
+        int digit = 0;
+        if (unsig) {
+            digit = (unsigned long)value % (unsigned)radix;
+        } else {
+            digit = value % radix;
+        }
         *(pbuffer++) =
             (digit < 10 ? '0' + digit :
                           (uppercase ? 'A' : 'a') + digit - 10);
+        if (unsig) {
+            value = (unsigned long) value / (unsigned) radix;
+        } else {
         value /= radix;
-    } while (value > 0);
+        }
+    } while (value != 0);
 
     for (i = (pbuffer - buffer); i < zero_pad; i++)
         *(pbuffer++) = '0';

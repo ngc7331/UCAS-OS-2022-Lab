@@ -27,12 +27,19 @@
 #define INCLUDE_TYPE_H_
 
 #ifndef NULL
-#define NULL 	(void*)0
+#define NULL 	((void*)0)
 #endif
 
+typedef int BOOL;
 #ifndef TRUE
 	#define TRUE 	1
 	#define FALSE 	0
+#endif
+
+typedef int bool;
+#ifndef true
+    #define true   1
+    #define false  0
 #endif
 
 typedef unsigned __attribute__((__mode__(QI))) int8_t;

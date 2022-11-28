@@ -3,6 +3,7 @@
 #include <asm/unistd.h>
 #include <common.h>
 #include <csr.h>
+#include <os/ioremap.h>
 #include <os/irq.h>
 #include <os/kernel.h>
 #include <os/loader.h>
@@ -14,6 +15,7 @@
 #include <os/task.h>
 #include <os/time.h>
 #include <os/pthread.h>
+#include <e1000.h>
 #include <printk.h>
 #include <screen.h>
 #include <sys/syscall.h>
@@ -202,9 +204,17 @@ int main(void) {
         init_shell();
         logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
-        // Read CPU frequency (｡•ᴗ-)_
+        // Read Flatten Device Tree (｡•ᴗ-)_
         time_base = bios_read_fdt(TIMEBASE);
-        logging(LOG_INFO, "init", "CPU frequency detected: %ld.\n", time_base);
+        e1000 = (volatile uint8_t *)bios_read_fdt(EHTERNET_ADDR);
+        uint64_t plic_addr = bios_read_fdt(PLIC_ADDR);
+        uint32_t nr_irqs = (uint32_t)bios_read_fdt(NR_IRQS);
+        logging(LOG_INFO, "init", "e1000: 0x%lx, plic_addr: 0x%lx, nr_irqs: 0x%lx.\n", e1000, plic_addr, nr_irqs);
+
+        // IOremap
+        plic_addr = (uintptr_t)ioremap((uint64_t)plic_addr, 0x4000 * NORMAL_PAGE_SIZE);
+        e1000 = (uint8_t *)ioremap((uint64_t)e1000, 8 * NORMAL_PAGE_SIZE);
+        logging(LOG_INFO, "init", "IOremap initialization succeeded.\n");
 
         // Init lock mechanism o(´^｀)o
         init_locks();
@@ -212,6 +222,14 @@ int main(void) {
         init_conditions();
         init_mbox();
         logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
+
+        // TODO: [p5-task4] Init plic
+        // plic_init(plic_addr, nr_irqs);
+        // logging(LOG_INFO, "init", "PLIC initialized successfully. addr = 0x%lx, nr_irqs=0x%x\n", plic_addr, nr_irqs);
+
+        // Init network device
+        e1000_init();
+        logging(LOG_INFO, "init", "E1000 device initialized successfully.\n");
 
         // Init interrupt (^_^)
         init_exception();

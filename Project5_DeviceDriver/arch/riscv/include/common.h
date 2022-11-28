@@ -47,8 +47,7 @@
 
 enum FDT_TYPE {
     TIMEBASE,
-    SLCR_BADE_ADDR,
-    ETHERNET_ADDR,
+    EHTERNET_ADDR = 2,
     PLIC_ADDR,
     NR_IRQS
 };
