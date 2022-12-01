@@ -77,7 +77,7 @@ static void e1000_configure_tx(void)
 
     /* Program the Transmit Control Register */
     e1000_write_reg(e1000, E1000_TCTL, E1000_TCTL_EN | E1000_TCTL_PSP |
-                                                      (E1000_TCTL_CT & (0x10 << 4)) | (E1000_TCTL_COLD & (0x40 << 12)));
+                                       (E1000_TCTL_CT & (0x10 << 4)) | (E1000_TCTL_COLD & (0x40 << 12)));
 }
 
 /**
@@ -85,15 +85,33 @@ static void e1000_configure_tx(void)
  **/
 static void e1000_configure_rx(void)
 {
-    /* TODO: [p5-task2] Set e1000 MAC Address to RAR[0] */
+    /* Set e1000 MAC Address to RAR[0] */
+    e1000_write_reg_array(e1000, E1000_RA, 0, (uint32_t) enetaddr[3] << 24 | (uint32_t) enetaddr[2] << 16 |
+                                              (uint32_t) enetaddr[1] << 8 | (uint32_t) enetaddr[0]); // RAL
+    e1000_write_reg_array(e1000, E1000_RA, 1, E1000_RAH_AV |
+                                              (uint32_t) enetaddr[5] << 8 | (uint32_t) enetaddr[4]); // RAH
 
-    /* TODO: [p5-task2] Initialize rx descriptors */
+    /* Initialize rx descriptors */
+    for (int i=0; i<RXDESCS; i++) {
+        rx_desc_array[i].addr = kva2pa((uint64_t) &rx_pkt_buffer[i]);
+        rx_desc_array[i].length = 0;
+        rx_desc_array[i].csum = 0;
+        rx_desc_array[i].status = 0;
+        rx_desc_array[i].errors = 0;
+        rx_desc_array[i].special = 0;
+    }
 
-    /* TODO: [p5-task2] Set up the Rx descriptor base address and length */
+    /* Set up the Rx descriptor base address and length */
+    e1000_write_reg(e1000, E1000_RDBAL, kva2pa((uint64_t) rx_desc_array) & 0xffffffff);
+    e1000_write_reg(e1000, E1000_RDBAH, kva2pa((uint64_t) rx_desc_array) >> 32);
+    e1000_write_reg(e1000, E1000_RDLEN, sizeof(rx_desc_array));
 
-    /* TODO: [p5-task2] Set up the HW Rx Head and Tail descriptor pointers */
+    /* Set up the HW Rx Head and Tail descriptor pointers */
+    e1000_write_reg(e1000, E1000_RDH, 0);
+    e1000_write_reg(e1000, E1000_RDT, RXDESCS - 1);
 
-    /* TODO: [p5-task2] Program the Receive Control Register */
+    /* Program the Receive Control Register */
+    e1000_write_reg(e1000, E1000_RCTL, E1000_RCTL_EN | E1000_RCTL_BAM);
 
     /* TODO: [p5-task4] Enable RXDMT0 Interrupt */
 }
@@ -131,11 +149,13 @@ int e1000_transmit(void *txpacket, int length)
 
     // copy to buf
     memcpy((uint8_t *) &tx_pkt_buffer[tdt], txpacket, length);
-    logging(LOG_DEBUG, "e1000", "... buf=%lx\n", (uint64_t) &tx_pkt_buffer[tdt]);
 
     // write desp
     tx_desc_array[tdt].addr = kva2pa((uint64_t) tx_pkt_buffer[tdt]);
     tx_desc_array[tdt].length = length;
+
+    // flush hardware
+    local_flush_dcache();
 
     // set tdt
     e1000_write_reg(e1000, E1000_TDT, (tdt+1) % TXDESCS);
@@ -148,9 +168,30 @@ int e1000_transmit(void *txpacket, int length)
  * @param rxbuffer - The address of buffer to store received packet
  * @return - Length of received packet
  **/
-int e1000_poll(void *rxbuffer)
-{
-    /* TODO: [p5-task2] Receive one packet and put it into rxbuffer */
+int e1000_poll(void *rxbuffer) {
+    /* Receive one packet and put it into rxbuffer */
+    uint32_t rdh, rdt;
+    do {
+        rdh = e1000_read_reg(e1000, E1000_RDH);
+        rdt = e1000_read_reg(e1000, E1000_RDT);
+    } while ((rdt+1) % TXDESCS == rdh);  // empty
+    logging(LOG_DEBUG, "e1000", "... rdt=%u, rdh=%u\n", rdt, rdh);
+    uint32_t next = (rdt+1) % TXDESCS;
 
-    return 0;
+    do {
+        // flush hardware
+        local_flush_dcache();
+    } while (!(rx_desc_array[next].status & E1000_RXD_STAT_DD));  // not ready
+    logging(LOG_DEBUG, "e1000", "... ready\n");
+
+    // read desp
+    int length = rx_desc_array[next].length;
+
+    // copy from buf
+    memcpy(rxbuffer, (uint8_t *) &rx_pkt_buffer[next], length);
+
+    // set rdt
+    e1000_write_reg(e1000, E1000_RDT, next);
+
+    return length;
 }
