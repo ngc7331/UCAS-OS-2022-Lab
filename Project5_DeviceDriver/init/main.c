@@ -9,6 +9,7 @@
 #include <os/loader.h>
 #include <os/lock.h>
 #include <os/mm.h>
+#include <os/net.h>
 #include <os/sched.h>
 #include <os/smp.h>
 #include <os/string.h>
@@ -167,6 +168,8 @@ static void init_syscall(void) {
     syscall[SYSCALL_PTHREAD_CREATE]= (long (*)()) pthread_create;
     syscall[SYSCALL_PTHREAD_JOIN]  = (long (*)()) pthread_join;
     syscall[SYSCALL_PTHREAD_EXIT]  = (long (*)()) pthread_exit;
+    syscall[SYSCALL_NET_SEND]      = (long (*)()) do_net_send;
+    syscall[SYSCALL_NET_RECV]      = (long (*)()) do_net_recv;
 }
 
 void init_shell(void) {

@@ -276,11 +276,9 @@ uint64_t sys_getpa(uint64_t va) {
 }
 
 int sys_net_send(void *txpacket, int length) {
-    /* TODO: [p5-task1] call invoke_syscall to implement sys_net_send */
-    return 0;
+    return invoke_syscall(SYSCALL_NET_SEND, (long) txpacket, length, IGNORE, IGNORE, IGNORE);
 }
 
 int sys_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens) {
-    /* TODO: [p5-task2] call invoke_syscall to implement sys_net_recv */
-    return 0;
+    return invoke_syscall(SYSCALL_NET_RECV, (long) rxbuffer, pkt_num, (long) pkt_lens, IGNORE, IGNORE);
 }

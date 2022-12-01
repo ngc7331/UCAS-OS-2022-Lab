@@ -43,13 +43,13 @@ page_t *alloc_page1(void) {
         page = list_entry(freepage_list.next, page_t, list);
         list_delete(freepage_list.next);
         list_delete(&page->onmem);
-        logging(LOG_DEBUG, "mm", "reuse page at 0x%x%x\n", page->kva>>32, page->kva);
+        logging(LOG_DEBUG, "mm", "reuse page at 0x%lx\n", page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
         list_init(&page->list);
         list_init(&page->onmem);
-        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%x%x\n", page->kva>>32, page->kva);
+        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%lx\n", page->kva);
     }
     page->tp = PAGE_KERNEL;
     page->va = 0;
@@ -69,7 +69,7 @@ void free_page1(page_t *page) {
     list_insert(&freepage_list, &page->list);
     if (page->tp == PAGE_USER)
         remaining_pf ++;
-    logging(LOG_DEBUG, "mm", "freed page at 0x%x%x\n", page->kva>>32, page->kva);
+    logging(LOG_DEBUG, "mm", "freed page at 0x%lx\n", page->kva);
 }
 
 void *kmalloc(size_t size) {
@@ -84,7 +84,7 @@ void *kmalloc(size_t size) {
         // NOTE: this can't be freed
         remaining = PAGE_SIZE;
         p = allocPage(1);
-        logging(LOG_INFO, "mm", "allocated a new page at 0x%x%x for kmalloc\n", p>>32, p);
+        logging(LOG_INFO, "mm", "allocated a new page at 0x%lx for kmalloc\n", p);
     }
     remaining -= size;
     void *ret = (void *) p;
@@ -127,7 +127,16 @@ list_node_t *get_page_list(pcb_t *pcb) {
 /* allocate physical page for `va`, mapping it into `pcb->pgdir`,
    return the kernel virtual address for the page
    */
-PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list) {
+PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
+    if (level != 0 && level != 1) {
+        logging(LOG_ERROR, "mm", "map_page: invalid arg, level must be 0 or 1\n");
+        return NULL;
+    }
+
+#ifdef S_CORE
+    level = 1;
+#endif
+
      // 3 level pgtables
     PTE *pt2 = (PTE *) pgdir;
     PTE *pt1 = NULL;
@@ -138,9 +147,9 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list) {
     uint64_t vpn1 = getvpn1(va);
     uint64_t vpn0 = getvpn0(va);
 
-    logging(LOG_INFO, "mm", "allocate page for addr 0x%x%x in pgtable at 0x%x%x\n", va>>32, va, pgdir>>32, pgdir);
+    logging(LOG_INFO, "mm", "allocate page for addr 0x%lx in pgtable at 0x%lx\n", va, pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
-    logging(LOG_VERBOSE, "mm", "... page_list=0x%x%x\n", (uint64_t)page_list>>32, (uint64_t)page_list);
+    logging(LOG_VERBOSE, "mm", "... page_list=0x%lx\n", (uint64_t) page_list);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
@@ -157,34 +166,35 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list) {
         pt1 = (PTE *) pa2kva(get_pa(pt2[vpn2]));
     }
 
-    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at 0x%x%x\n", (uint64_t)pt1>>32, (uint64_t)pt1);
+    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at 0x%lx\n", (uint64_t) pt1);
 
-#ifdef S_CORE
-    // find pte
-    PTE *pte = &pt1[vpn1];
-#else
-    // find level-0 pgtable
-    if (!(pt1[vpn1] & _PAGE_PRESENT)) {
-        // alloc a new second-level page directory
-        page_t *tmp = alloc_page1();
-        if (page_list != NULL)
-            list_insert(page_list, &tmp->list);
-        uintptr_t page = tmp->kva;
-        set_pfn(&pt1[vpn1], kva2pa(page) >> NORMAL_PAGE_SHIFT);
-        set_attribute(&pt1[vpn1], _PAGE_PRESENT);
-        clear_pgdir(page);
-        pt0 = (PTE *) page;
+    PTE *pte;
+    if (level == 1) {
+        // find pte
+        pte = &pt1[vpn1];
     } else {
-        pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
+        // find level-0 pgtable
+        if (!(pt1[vpn1] & _PAGE_PRESENT)) {
+            // alloc a new second-level page directory
+            page_t *tmp = alloc_page1();
+            if (page_list != NULL)
+                list_insert(page_list, &tmp->list);
+            uintptr_t page = tmp->kva;
+            set_pfn(&pt1[vpn1], kva2pa(page) >> NORMAL_PAGE_SHIFT);
+            set_attribute(&pt1[vpn1], _PAGE_PRESENT);
+            clear_pgdir(page);
+            pt0 = (PTE *) page;
+        } else {
+            pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
+        }
+
+        logging(LOG_VERBOSE, "mm", "... level-0 pgtable at 0x%lx\n", (uint64_t) pt0);
+
+        // find pte
+        pte = &pt0[vpn0];
     }
 
-    logging(LOG_VERBOSE, "mm", "... level-0 pgtable at 0x%x%x\n", (uint64_t)pt0>>32, (uint64_t)pt0);
-
-    // find pte
-    PTE *pte = &pt0[vpn0];
-#endif
-
-    logging(LOG_VERBOSE, "mm", "... pte at 0x%x%x\n", (uint64_t)pte>>32, (uint64_t)pte);
+    logging(LOG_VERBOSE, "mm", "... pte at 0x%lx\n", (uint64_t) pte);
     return pte;
 }
 
@@ -196,7 +206,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     }
 
     list_node_t *page_list = get_page_list(pcb);
-    PTE *pte = map_page(va, pcb->pgdir, &pcb->page_list);
+    PTE *pte = map_page(va, pcb->pgdir, &pcb->page_list, 0);
 
     // allocate a new page for va
 #ifdef S_CORE
@@ -222,7 +232,7 @@ uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb) {
     uintptr_t page = tmp->kva;
 #endif
 
-    logging(LOG_DEBUG, "mm", "... allocated page at 0x%x%x\n", (uint64_t)page>>32, (uint64_t)page);
+    logging(LOG_DEBUG, "mm", "... allocated page at 0x%lx\n", (uint64_t) page);
 
     // set pgtable
     set_pfn(pte, kva2pa(page) >> NORMAL_PAGE_SHIFT);

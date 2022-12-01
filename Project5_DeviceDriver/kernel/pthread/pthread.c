@@ -50,8 +50,8 @@ static void init_tcb_stack(ptr_t kernel_stack, ptr_t entry_point, void *arg, pcb
 
 pid_t pthread_create(uint64_t entrypoint, void *arg) {
     int cid = get_current_cpu_id();
-    logging(LOG_INFO, "scheduler", "%d.%s.%d create thread entrypoint=0x%x%x, arg=0x%x%x\n",
-            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, entrypoint>>32, entrypoint, (uint64_t)arg>>32, (uint64_t)arg);
+    logging(LOG_INFO, "scheduler", "%d.%s.%d create thread entrypoint=0x%lx, arg=0x%lx\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, entrypoint, (uint64_t) arg);
 
     do_garbage_collector();
     // get new idx

@@ -66,7 +66,7 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
         uint64_t kva = pa2kva(get_pa(*pte));
         uint64_t new_kva = alloc_page_helper(stval, current_running[cid]);
         memcpy((uint8_t *) new_kva, (uint8_t *) kva, PAGE_SIZE);
-        logging(LOG_INFO, "pgfault", "write to snapshot at 0x%x%x, copy to 0x%x%x\n", kva>>32, kva, new_kva>>32, new_kva);
+        logging(LOG_INFO, "pgfault", "write to snapshot at 0x%lx, copy to 0x%lx\n", kva, new_kva);
     }
     // set attribute
     if (code == EXCC_LOAD_PAGE_FAULT) {

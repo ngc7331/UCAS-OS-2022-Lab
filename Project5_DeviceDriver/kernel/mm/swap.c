@@ -46,13 +46,13 @@ uintptr_t swap_out() {
     page->swap = alloc_swap1();
     // delete from onmem
     list_delete(onmem_list.next);
-    logging(LOG_DEBUG, "swap", "... from 0x%x%x\n", page->kva>>32, page->kva);
+    logging(LOG_DEBUG, "swap", "... from 0x%lx\n", page->kva);
     // set pfn & attr
     PTE *pte = get_pte_of(page->va, page->owner->pgdir, 0);
     set_attribute(pte, get_attribute(*pte, _PAGE_CTRL_MASK) & ~_PAGE_PRESENT);
     // store to disk
     bios_sdwrite(kva2pa(page->kva), PAGE_SIZE/SECTOR_SIZE, page->swap->pa);
-    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%x%x, diskptr=0x%x\n", page->owner->pid, page->va>>32, page->va, page->swap->pa);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%lx, diskptr=0x%x\n", page->owner->pid, page->va, page->swap->pa);
     // reset kva
     uintptr_t kva = page->kva;
     page->kva = 0;
@@ -61,12 +61,12 @@ uintptr_t swap_out() {
 
 void swap_in(page_t *page, uintptr_t kva) {
     logging(LOG_INFO, "swap", "load page from disk\n");
-    logging(LOG_DEBUG, "swap", "... to 0x%x%x\n", kva>>32, kva);
+    logging(LOG_DEBUG, "swap", "... to 0x%lx\n", kva);
     // reset kva
     page->kva = kva;
     // load from disk
     bios_sdread(kva2pa(kva), PAGE_SIZE/SECTOR_SIZE, page->swap->pa);
-    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%x%x, diskptr=0x%x\n", page->owner->pid, page->va>>32, page->va, page->swap->pa);
+    logging(LOG_DEBUG, "swap", "... pid=%d, va=0x%lx, diskptr=0x%x\n", page->owner->pid, page->va, page->swap->pa);
     // free swap sector
     free_swap1(page->swap);
     page->swap = NULL;
@@ -89,7 +89,7 @@ page_t *check_and_swap(pcb_t *pcb, uintptr_t va) {
         if (page->swap == NULL) {
             if (page->tp != PAGE_USER)
                 continue;
-            logging(LOG_ERROR, "swap", "page record found, but not on disk, kva=0x%x%x\n", page->kva>>32, page->kva);
+            logging(LOG_ERROR, "swap", "page record found, but not on disk, kva=0x%lx\n", page->kva);
             return NULL;
         }
         uintptr_t kva = swap_out();

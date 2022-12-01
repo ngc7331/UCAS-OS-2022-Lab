@@ -83,7 +83,7 @@ ptr_t allocLargePage(int numPage);
 void *kmalloc(size_t size);
 void share_pgtable(uintptr_t dest_pgdir, uintptr_t src_pgdir);
 list_node_t *get_page_list(pcb_t *pcb);
-PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list);
+PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level);
 uintptr_t alloc_page_helper(uintptr_t va, pcb_t *pcb);
 
 // swap

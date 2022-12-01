@@ -14,8 +14,8 @@ uint64_t load_img(uint64_t memaddr, uint64_t phyaddr, uint64_t size) {
         buff = allocPage(SECTOR_SIZE * MAX_SECTOR_READ / PAGE_SIZE);
     uint64_t memaddr_ori = memaddr;
 
-    logging(LOG_INFO, "loader", "load 0x%x%x bytes from 0x%x%x to 0x%x%x\n",
-            size>>32, size, phyaddr>>32, phyaddr, memaddr>>32, memaddr);
+    logging(LOG_INFO, "loader", "load 0x%lx bytes from 0x%lx to 0x%lx\n",
+            size, phyaddr, memaddr);
 
     uint64_t block_id = phyaddr / SECTOR_SIZE;
 

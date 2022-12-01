@@ -73,15 +73,15 @@ uintptr_t shm_page_get(int key)
     // add ref
     shm_pages[idx].ref ++;
     // map page
-    PTE *pte = map_page(va, current_running[cid]->pgdir, NULL);
+    PTE *pte = map_page(va, current_running[cid]->pgdir, NULL, 0);
     // set pgtable
     set_pfn(pte, kva2pa(shm_pages[idx].page->kva) >> NORMAL_PAGE_SHIFT);
     set_attribute(pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | _PAGE_EXEC | _PAGE_USER);
 
     logging(LOG_INFO, "shm", "%d.%s attach shm[%d] with key=%d\n",
             current_running[cid]->pid, current_running[cid]->name, idx, key);
-    logging(LOG_DEBUG, "shm", "... kva=0x%x%x, va=0x%x%x\n",
-            shm_pages[idx].page->kva>>32, shm_pages[idx].page->kva, va>>32, va);
+    logging(LOG_DEBUG, "shm", "... kva=0x%lx, va=0x%lx\n",
+            shm_pages[idx].page->kva, va);
 
     return va;
 }

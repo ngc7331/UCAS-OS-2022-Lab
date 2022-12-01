@@ -83,8 +83,8 @@ static void init_pcb_stack(
         user_sp_kva -= len;
         strcpy(user_sp_kva, argv[i]);
         pt_argv[i] = user_sp;
-        logging(LOG_DEBUG, "scheduler", "... argv[%d]=\"%s\" placed at va=%x%x(kva=0x%x%x)\n",
-                i, argv[i], (uint64_t)user_sp>>32, (uint64_t)user_sp, (uint64_t)user_sp_kva>>32, (uint64_t)user_sp_kva);
+        logging(LOG_DEBUG, "scheduler", "... argv[%d]=\"%s\" placed at va=0x%lx(kva=0x%lx)\n",
+                i, argv[i], (uint64_t) user_sp, (uint64_t) user_sp_kva);
     }
     pt_argv[argc] = NULL;
     // alignment
@@ -100,7 +100,7 @@ static void init_pcb_stack(
 
     pcb->kernel_sp = (reg_t) pt_switchto;
     pcb->user_sp = (reg_t) user_sp;
-    logging(LOG_DEBUG, "scheduler", "... kernel_sp=0x%x%x, user_sp=0x%lx\n", pcb->kernel_sp >> 32, pcb->kernel_sp, pcb->user_sp);
+    logging(LOG_DEBUG, "scheduler", "... kernel_sp=0x%lx, user_sp=0x%lx\n", pcb->kernel_sp, pcb->user_sp);
 
     // save regs to kernel_stack
     pt_switchto->regs[0] = (reg_t) ret_from_exception;
@@ -212,7 +212,7 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
     pcb[idx].status = TASK_READY;
 
     logging(LOG_INFO, "scheduler", "loaded %s as pid=%d\n", pcb[idx].name, pcb[idx].pid);
-    logging(LOG_DEBUG, "scheduler", "... pgdir=0x%x%x\n", pcb[idx].pgdir >> 32, pcb[idx].pgdir);
+    logging(LOG_DEBUG, "scheduler", "... pgdir=0x%lx\n", pcb[idx].pgdir);
     logging(LOG_DEBUG, "scheduler", "... entrypoint=0x%lx\n", apps[id].entrypoint);
 
     init_pcb_stack(pcb[idx].kernel_sp, pcb[idx].user_sp, user_stack_kva,

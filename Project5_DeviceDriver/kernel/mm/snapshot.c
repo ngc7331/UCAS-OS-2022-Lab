@@ -22,13 +22,12 @@ uint64_t do_snapshot(uint64_t va) {
         }
     }
     // map pagedir for new va
-    PTE *new_pte = map_page(new_va, current_running[cid]->pgdir, &current_running[cid]->page_list);
+    PTE *new_pte = map_page(new_va, current_running[cid]->pgdir, &current_running[cid]->page_list, 0);
     // set attr for new pte
     set_pfn(new_pte, get_pfn(*pte));
     set_attribute(new_pte, _PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE | _PAGE_EXEC | _PAGE_USER);
-    logging(LOG_INFO, "snapshot", "%d.%s.%d create snapshot for 0x%x%x at 0x%x%x\n",
-            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid,
-            va>>32, va, new_va>>32, new_va);
+    logging(LOG_INFO, "snapshot", "%d.%s.%d create snapshot for 0x%lx at 0x%lx\n",
+            current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, va, new_va);
     return new_va;
 }
 
