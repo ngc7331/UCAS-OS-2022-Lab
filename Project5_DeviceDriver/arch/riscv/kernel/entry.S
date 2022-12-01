@@ -117,6 +117,8 @@
 
 ENTRY(enable_preempt)
   not t0, x0
+  // for p5-task1~3
+  xori t0, t0, SIE_SEIE
   csrs CSR_SIE, t0
   jr ra
 ENDPROC(enable_preempt)
