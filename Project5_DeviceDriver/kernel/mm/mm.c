@@ -137,7 +137,7 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
     level = 1;
 #endif
 
-     // 3 level pgtables
+    // 3 level pgtables
     PTE *pt2 = (PTE *) pgdir;
     PTE *pt1 = NULL;
     PTE *pt0 = NULL;
@@ -149,7 +149,8 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
 
     logging(LOG_INFO, "mm", "allocate page for addr 0x%lx in pgtable at 0x%lx\n", va, pgdir);
     logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
-    logging(LOG_VERBOSE, "mm", "... page_list=0x%lx\n", (uint64_t) page_list);
+    if (page_list != NULL)
+        logging(LOG_VERBOSE, "mm", "... page_list=0x%lx\n", (uint64_t) page_list);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {

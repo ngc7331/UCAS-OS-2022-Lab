@@ -167,7 +167,7 @@ static inline uintptr_t get_kva_of(uintptr_t va, uintptr_t pgdir_va) {
 }
 
 static inline uint64_t getvpn2(uint64_t va) {
-    return va >> (NORMAL_PAGE_SHIFT + PPN_BITS + PPN_BITS);
+    return (va >> (NORMAL_PAGE_SHIFT + PPN_BITS + PPN_BITS)) & VPN_MASK;
 }
 
 static inline uint64_t getvpn1(uint64_t va) {
