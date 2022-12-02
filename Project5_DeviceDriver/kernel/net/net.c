@@ -17,17 +17,14 @@ int do_net_send(void *txpacket, int length) {
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, (uint64_t) txpacket, length);
 
     while (e1000_transmit(txpacket, length) == -1) {
-        // Call do_block when e1000 transmit queue is full
+        // Enable TXQE interrupt if transmit queue is full
+        e1000_write_reg(e1000, E1000_IMS, E1000_IMS_TXQE);
+        // And call do_block
         logging(LOG_DEBUG, "net", "send queue full, block\n");
         do_block(current_running[cid], &send_block_queue);
     }
 
     check_net_send();
-
-    // Enable TXQE interrupt if transmit queue is full
-    if (!check_tx()) {
-        e1000_write_reg(e1000, E1000_IMS, E1000_IMS_TXQE);
-    }
 
     return length;  // Bytes it has transmitted
 }
