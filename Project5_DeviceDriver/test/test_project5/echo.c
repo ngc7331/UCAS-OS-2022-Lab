@@ -4,13 +4,13 @@
 #include <unistd.h>
 
 #define SHM_KEY 233
-#define MUTEX_KEY 114514 
+#define MUTEX_KEY 114514
 #define COND_KEY_FULL 1919
 #define COND_KEY_EMPTY 810
 
 typedef struct {
     int length;
-    uint8_t buf[2048];
+    char buf[2048];
 } shm_buf_t;
 
 void clearline(int line) {

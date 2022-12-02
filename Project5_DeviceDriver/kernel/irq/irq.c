@@ -4,6 +4,7 @@
 #include <os/string.h>
 #include <os/kernel.h>
 #include <os/mm.h>
+#include <os/net.h>
 #include <os/smp.h>
 #include <os/loader.h>
 #include <printk.h>
@@ -11,6 +12,7 @@
 #include <csr.h>
 #include <screen.h>
 #include <pgtable.h>
+#include <plic.h>
 
 handler_t irq_table[IRQC_COUNT];
 handler_t exc_table[EXCC_COUNT];
@@ -79,8 +81,20 @@ void handle_page_fault(regs_context_t *regs, uint64_t stval, uint64_t scause) {
 
 void handle_irq_ext(regs_context_t *regs, uint64_t stval, uint64_t scause)
 {
-    // TODO: [p5-task4] external interrupt handler.
+    // external interrupt handler.
     // Note: plic_claim and plic_complete will be helpful ...
+    uint32_t id = plic_claim();
+
+    switch (id) {
+    case PLIC_E1000_PYNQ_IRQ: case PLIC_E1000_QEMU_IRQ:
+        net_handle_irq();
+        break;
+    default:
+        // logging(LOG_WARNING, "irq", "unregistered plic irq, id=%d\n", id);
+        break;
+    }
+
+    plic_complete(id);
 }
 
 void init_exception()
@@ -99,6 +113,7 @@ void init_exception()
     for (int i=0; i<IRQC_COUNT; i++)
         irq_table[i] = handle_other;
     irq_table[IRQC_S_TIMER] = handle_irq_timer;
+    irq_table[IRQC_S_EXT] = handle_irq_ext;
 
     /* set up the entrypoint of exceptions */
     setup_exception();

@@ -24,7 +24,10 @@ int do_net_send(void *txpacket, int length) {
 
     check_net_send();
 
-    // TODO: [p5-task4] Enable TXQE interrupt if transmit queue is full
+    // Enable TXQE interrupt if transmit queue is full
+    if (!check_tx()) {
+        e1000_write_reg(e1000, E1000_IMS, E1000_IMS_TXQE);
+    }
 
     return length;  // Bytes it has transmitted
 }
@@ -52,7 +55,19 @@ int do_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens) {
 }
 
 void net_handle_irq(void) {
-    // TODO: [p5-task4] Handle interrupts from network device
+    // Handle interrupts from network device
+    uint32_t icr = e1000_read_reg(e1000, E1000_ICR);
+    uint32_t ims = e1000_read_reg(e1000, E1000_IMS);
+    if (icr & ims & E1000_ICR_RXDMT0) {
+        // wakeup receiver
+        check_net_recv();
+    }
+    if (icr & ims & E1000_ICR_TXQE) {
+        // Disable TXQE interrupt
+        e1000_write_reg(e1000, E1000_IMC, E1000_IMC_TXQE);
+        // wakeup sender
+        check_net_send();
+    }
 }
 
 void check_net_send() {

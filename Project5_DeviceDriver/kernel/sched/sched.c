@@ -233,12 +233,10 @@ pid_t do_exec(char *name, int argc, char *argv[]) {
 void do_scheduler(void) {
     int cid = get_current_cpu_id();
 
-    // Check sleep queue to wake up PCBs
+    // Check sleep/send/recv queue to wake up PCBs
     check_sleeping();
-    check_net_send();
-    check_net_recv();
-
-    // TODO: [p5-task3] Check send/recv queue to unblock PCBs
+    // check_net_send();
+    // check_net_recv();
 
     pcb_t *prev = current_running[cid];
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);

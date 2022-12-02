@@ -111,9 +111,11 @@ static void e1000_configure_rx(void)
     e1000_write_reg(e1000, E1000_RDT, RXDESCS - 1);
 
     /* Program the Receive Control Register */
+    // BSEX = 0, BSIZE = 0, RXDMT = 0
     e1000_write_reg(e1000, E1000_RCTL, E1000_RCTL_EN | E1000_RCTL_BAM);
 
-    /* TODO: [p5-task4] Enable RXDMT0 Interrupt */
+    /* Enable RXDMT0 Interrupt */
+    e1000_write_reg(e1000, E1000_IMS, E1000_IMS_RXDMT0);
 }
 
 /**

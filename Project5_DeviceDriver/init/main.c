@@ -17,6 +17,7 @@
 #include <os/time.h>
 #include <os/pthread.h>
 #include <e1000.h>
+#include <plic.h>
 #include <printk.h>
 #include <screen.h>
 #include <sys/syscall.h>
@@ -224,9 +225,9 @@ int main(void) {
         init_mbox();
         logging(LOG_INFO, "init", "Lock mechanism initialization succeeded.\n");
 
-        // TODO: [p5-task4] Init plic
-        // plic_init(plic_addr, nr_irqs);
-        // logging(LOG_INFO, "init", "PLIC initialized successfully. addr = 0x%lx, nr_irqs=0x%x\n", plic_addr, nr_irqs);
+        // Init plic
+        plic_init(plic_addr, nr_irqs);
+        logging(LOG_INFO, "init", "PLIC initialized successfully. addr = 0x%lx, nr_irqs=0x%x\n", plic_addr, nr_irqs);
 
         // Init network device
         e1000_init();
