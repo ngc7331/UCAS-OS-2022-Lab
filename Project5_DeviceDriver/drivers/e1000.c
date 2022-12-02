@@ -174,9 +174,9 @@ int e1000_poll(void *rxbuffer) {
     do {
         rdh = e1000_read_reg(e1000, E1000_RDH);
         rdt = e1000_read_reg(e1000, E1000_RDT);
-    } while ((rdt+1) % TXDESCS == rdh);  // empty
+    } while ((rdt+1) % RXDESCS == rdh);  // empty
     logging(LOG_DEBUG, "e1000", "... rdt=%u, rdh=%u\n", rdt, rdh);
-    uint32_t next = (rdt+1) % TXDESCS;
+    uint32_t next = (rdt+1) % RXDESCS;
 
     do {
         // flush hardware
