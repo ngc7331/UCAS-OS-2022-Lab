@@ -182,7 +182,6 @@ int e1000_poll(void *rxbuffer) {
         // flush hardware
         local_flush_dcache();
     } while (!(rx_desc_array[next].status & E1000_RXD_STAT_DD));  // not ready
-    logging(LOG_DEBUG, "e1000", "... ready\n");
 
     // read desp
     int length = rx_desc_array[next].length;

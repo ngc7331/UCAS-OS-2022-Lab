@@ -4,6 +4,7 @@
 #include <stdarg.h>
 
 typedef enum {
+    LOG_VV,
     LOG_VERBOSE,
     LOG_DEBUG,
     LOG_INFO,

@@ -241,13 +241,13 @@ void do_scheduler(void) {
     pcb_t *next = pcb_dequeue(&ready_queue, 1 << cid);
     if (next == NULL) {
         if (current_running[cid]->status == TASK_RUNNING) {
-            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, back to %d.%s.%d\n", prev->pid, prev->name, prev->tid);
+            logging(LOG_VV, "scheduler", "ready_queue empty, back to %d.%s.%d\n", prev->pid, prev->name, prev->tid);
             return ;
         } else if (pid0_pcb[0].status == TASK_READY) {
-            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, use 0.init.0\n");
+            logging(LOG_VV, "scheduler", "ready_queue empty, use 0.init.0\n");
             next = &pid0_pcb[0];
         } else if (pid0_pcb[1].status == TASK_READY) {
-            logging(LOG_VERBOSE, "scheduler", "ready_queue empty, use 0.init.1\n");
+            logging(LOG_VV, "scheduler", "ready_queue empty, use 0.init.1\n");
             next = &pid0_pcb[1];
         } else{
             logging(LOG_CRITICAL, "scheduler", "ready_queue empty, kernel not ready yet\n");
@@ -255,7 +255,7 @@ void do_scheduler(void) {
         }
     }
 
-    logging(LOG_VERBOSE, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
+    logging(LOG_VV, "scheduler", "%d.%s.%d -> %d.%s.%d\n", prev->pid, prev->name, prev->tid, next->pid, next->name, next->tid);
 
     if (prev->status == TASK_RUNNING) {
         prev->status = TASK_READY;

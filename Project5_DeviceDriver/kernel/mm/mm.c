@@ -43,13 +43,13 @@ page_t *alloc_page1(void) {
         page = list_entry(freepage_list.next, page_t, list);
         list_delete(freepage_list.next);
         list_delete(&page->onmem);
-        logging(LOG_DEBUG, "mm", "reuse page at 0x%lx\n", page->kva);
+        logging(LOG_VERBOSE, "mm", "reuse page at 0x%lx\n", page->kva);
     } else {
         page = (page_t *) kmalloc(sizeof(page_t));
         page->kva = allocPage(1);
         list_init(&page->list);
         list_init(&page->onmem);
-        logging(LOG_DEBUG, "mm", "allocated a new page at 0x%lx\n", page->kva);
+        logging(LOG_VERBOSE, "mm", "allocated a new page at 0x%lx\n", page->kva);
     }
     page->tp = PAGE_KERNEL;
     page->va = 0;
@@ -69,7 +69,7 @@ void free_page1(page_t *page) {
     list_insert(&freepage_list, &page->list);
     if (page->tp == PAGE_USER)
         remaining_pf ++;
-    logging(LOG_DEBUG, "mm", "freed page at 0x%lx\n", page->kva);
+    logging(LOG_VERBOSE, "mm", "freed page at 0x%lx\n", page->kva);
 }
 
 void *kmalloc(size_t size) {
@@ -148,9 +148,9 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
     uint64_t vpn0 = getvpn0(va);
 
     logging(LOG_INFO, "mm", "allocate page for addr 0x%lx in pgtable at 0x%lx\n", va, pgdir);
-    logging(LOG_VERBOSE, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
+    logging(LOG_VV, "mm", "... vpn2=0x%x, vpn1=0x%x, vpn0=0x%x\n", vpn2, vpn1, vpn0);
     if (page_list != NULL)
-        logging(LOG_VERBOSE, "mm", "... page_list=0x%lx\n", (uint64_t) page_list);
+        logging(LOG_VV, "mm", "... page_list=0x%lx\n", (uint64_t) page_list);
 
     // find level-1 pgtable
     if (!(pt2[vpn2] & _PAGE_PRESENT)) {
@@ -167,7 +167,7 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
         pt1 = (PTE *) pa2kva(get_pa(pt2[vpn2]));
     }
 
-    logging(LOG_VERBOSE, "mm", "... level-1 pgtable at 0x%lx\n", (uint64_t) pt1);
+    logging(LOG_VV, "mm", "... level-1 pgtable at 0x%lx\n", (uint64_t) pt1);
 
     PTE *pte;
     if (level == 1) {
@@ -189,7 +189,7 @@ PTE *map_page(uintptr_t va, uint64_t pgdir, list_node_t *page_list, int level) {
             pt0 = (PTE *) pa2kva(get_pa(pt1[vpn1]));
         }
 
-        logging(LOG_VERBOSE, "mm", "... level-0 pgtable at 0x%lx\n", (uint64_t) pt0);
+        logging(LOG_VV, "mm", "... level-0 pgtable at 0x%lx\n", (uint64_t) pt0);
 
         // find pte
         pte = &pt0[vpn0];

@@ -23,19 +23,19 @@ swap_t *alloc_swap1(void) {
     if (!list_is_empty(&freeswap_list)) {
         swap = list_entry(freeswap_list.next, swap_t, list);
         list_delete(freeswap_list.next);
-        logging(LOG_DEBUG, "swap", "reuse sector at 0x%x\n", swap->pa);
+        logging(LOG_VERBOSE, "swap", "reuse sector at 0x%x\n", swap->pa);
     } else {
         swap = (swap_t *) kmalloc(sizeof(swap_t));
         list_init(&swap->list);
         swap->pa = allocDBlock(PAGE_SIZE / SECTOR_SIZE);
-        logging(LOG_DEBUG, "swap", "allocate new sector at 0x%x\n", swap->pa);
+        logging(LOG_VERBOSE, "swap", "allocate new sector at 0x%x\n", swap->pa);
     }
     return swap;
 }
 
 void free_swap1(swap_t *swap) {
     list_insert(&freeswap_list, &swap->list);
-    logging(LOG_DEBUG, "swap", "freed sector at 0x%x\n", swap->pa);
+    logging(LOG_VERBOSE, "swap", "freed sector at 0x%x\n", swap->pa);
 }
 
 // FIFO swap
