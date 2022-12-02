@@ -8,6 +8,7 @@
 #include <os/task.h>
 #include <os/time.h>
 #include <os/mm.h>
+#include <os/net.h>
 #include <screen.h>
 #include <printk.h>
 #include <assert.h>
@@ -234,6 +235,8 @@ void do_scheduler(void) {
 
     // Check sleep queue to wake up PCBs
     check_sleeping();
+    check_net_send();
+    check_net_recv();
 
     // TODO: [p5-task3] Check send/recv queue to unblock PCBs
 

@@ -141,10 +141,12 @@ int e1000_transmit(void *txpacket, int length)
 {
     /* Transmit one packet from txpacket */
     uint32_t tdh, tdt;
-    do {
-        tdh = e1000_read_reg(e1000, E1000_TDH);
-        tdt = e1000_read_reg(e1000, E1000_TDT);
-    } while ((tdt+1) % TXDESCS == tdh);  // full
+    tdh = e1000_read_reg(e1000, E1000_TDH);
+    tdt = e1000_read_reg(e1000, E1000_TDT);
+
+    if ((tdt+1) % TXDESCS == tdh)  // full
+        return -1;
+
     logging(LOG_DEBUG, "e1000", "... tdt=%u, tdh=%u\n", tdt, tdh);
 
     // copy to buf
@@ -171,10 +173,12 @@ int e1000_transmit(void *txpacket, int length)
 int e1000_poll(void *rxbuffer) {
     /* Receive one packet and put it into rxbuffer */
     uint32_t rdh, rdt;
-    do {
-        rdh = e1000_read_reg(e1000, E1000_RDH);
-        rdt = e1000_read_reg(e1000, E1000_RDT);
-    } while ((rdt+1) % RXDESCS == rdh);  // empty
+    rdh = e1000_read_reg(e1000, E1000_RDH);
+    rdt = e1000_read_reg(e1000, E1000_RDT);
+
+    if ((rdt+1) % RXDESCS == rdh)  // empty
+        return -1;
+
     logging(LOG_DEBUG, "e1000", "... rdt=%u, rdh=%u\n", rdt, rdh);
     uint32_t next = (rdt+1) % RXDESCS;
 
@@ -193,4 +197,12 @@ int e1000_poll(void *rxbuffer) {
     e1000_write_reg(e1000, E1000_RDT, next);
 
     return length;
+}
+
+int check_tx() {
+    return ((e1000_read_reg(e1000, E1000_TDT) + 1) % TXDESCS) != e1000_read_reg(e1000, E1000_TDH);
+}
+
+int check_rx() {
+    return ((e1000_read_reg(e1000, E1000_RDT) + 1) % RXDESCS) != e1000_read_reg(e1000, E1000_RDH);
 }

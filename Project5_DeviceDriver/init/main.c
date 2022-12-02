@@ -204,8 +204,6 @@ int main(void) {
         logging(LOG_INFO, "init", "PCB[] initialization succeeded.\n");
         init_pid0_pcb();
         logging(LOG_INFO, "init", "PID0_PCB initialization succeeded.\n");
-        init_shell();
-        logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
         // Read Flatten Device Tree (｡•ᴗ-)_
         time_base = bios_read_fdt(TIMEBASE);
@@ -249,6 +247,10 @@ int main(void) {
         // Init screen (QAQ)
         init_screen();
         logging(LOG_INFO, "init", "SCREEN initialization succeeded.\n");
+
+        // Init shell
+        init_shell();
+        logging(LOG_INFO, "init", "Shell initialization succeeded.\n");
 
         // wake up slave
         logging(LOG_INFO, "init", "Wake up slave core.\n");

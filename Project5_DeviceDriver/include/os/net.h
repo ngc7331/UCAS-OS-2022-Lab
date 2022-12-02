@@ -10,4 +10,7 @@ void net_handle_irq(void);
 int do_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens);
 int do_net_send(void *txpacket, int length);
 
+void check_net_send();
+void check_net_recv();
+
 #endif  // !__INCLUDE_NET_H__

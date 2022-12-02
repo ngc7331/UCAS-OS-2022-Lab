@@ -15,9 +15,14 @@ int do_net_send(void *txpacket, int length) {
     logging(LOG_INFO, "net", "%d.%s.%d send from 0x%lx, length = %d\n",
             current_running[cid]->pid, current_running[cid]->name, current_running[cid]->tid, (uint64_t) txpacket, length);
 
-    e1000_transmit(txpacket, length);
+    while (e1000_transmit(txpacket, length) == -1) {
+        // Call do_block when e1000 transmit queue is full
+        logging(LOG_DEBUG, "net", "send queue full, block\n");
+        do_block(current_running[cid], &send_block_queue);
+    }
 
-    // TODO: [p5-task3] Call do_block when e1000 transmit queue is full
+    check_net_send();
+
     // TODO: [p5-task4] Enable TXQE interrupt if transmit queue is full
 
     return length;  // Bytes it has transmitted
@@ -31,17 +36,32 @@ int do_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens) {
 
     int offset = 0;
     for (int i=0; i<pkt_num; i++) {
-        pkt_lens[i] = e1000_poll(rxbuffer + offset);
+        while ((pkt_lens[i] = e1000_poll(rxbuffer + offset)) == -1) {
+            // Call do_block when there is no packet on the way
+            logging(LOG_DEBUG, "net", "recv queue empty, block\n");
+            do_block(current_running[cid], &recv_block_queue);
+        }
         logging(LOG_DEBUG, "net", "... pkt[%d] offset = %d, length = %d\n", i, offset, pkt_lens[i]);
         offset += pkt_lens[i];
     }
 
-    // TODO: [p5-task3] Call do_block when there is no packet on the way
+    check_net_recv();
 
     return 0;  // Bytes it has received
 }
 
-void net_handle_irq(void)
-{
+void net_handle_irq(void) {
     // TODO: [p5-task4] Handle interrupts from network device
+}
+
+void check_net_send() {
+    if (!check_tx() || list_is_empty(&send_block_queue))
+        return ;
+    do_unblock(&send_block_queue);
+}
+
+void check_net_recv() {
+    if (!check_rx() || list_is_empty(&recv_block_queue))
+        return ;
+    do_unblock(&recv_block_queue);
 }
