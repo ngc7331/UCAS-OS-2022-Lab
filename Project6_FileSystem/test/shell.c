@@ -162,12 +162,7 @@ int main(void) {
         // commands
         // TODO [P6-task1]: mkfs, statfs, cd, mkdir, rmdir, ls
         // TODO [P6-task2]: touch, cat, ln, ls -l, rm
-        if (strcmp("ps", argv[0]) == 0) {
-            int mode = 0;
-            if (argc >= 2 && strcmp("-v", argv[1]) == 0)
-                mode = 1;
-            sys_ps(mode);
-        } else if (strcmp("clear", argv[0]) == 0) {
+        if (strcmp("clear", argv[0]) == 0) {
             init_shell();
         } else if (strcmp("exec", argv[0]) == 0) {
             int bg = argv[argc-1][0] == '&' && argv[argc-1][1] == '\0';
@@ -203,6 +198,26 @@ int main(void) {
             }
         } else if (strcmp("exit", argv[0]) == 0) {
             exit();
+        } else if (strcmp("help", argv[0]) == 0) {
+            printf("--- HELP START ---\n");
+            printf("  ps: show processes\n");
+            printf("  clear: clear screen\n");
+            printf("  exec name [arg0] ...: start a new process\n");
+            printf("  exit: exit shell\n");
+            printf("  kill pid: kill a existing process\n");
+            printf("  help: print this help message\n");
+            printf("  history: show cmd history\n");
+            printf("  ts: show tasks\n");
+            printf("  taskset -p mask pid / taskset mask name [arg0] ...: set pid's mask\n");
+            printf("  shortcut keys:\n");
+            printf("     Ctrl+C: clear line\n");
+            printf("     Ctrl+D: exit shell\n");
+            printf("     Ctrl+L: clear screen\n");
+            printf("---- HELP END ----\n");
+        } else if (strcmp("history", argv[0]) == 0) {
+            for (int i=0; i<HISTSIZE; i++) {
+                printf("[%02d] %s\n", i, history[(i + hp) % HISTSIZE]);
+            }
         } else if (strcmp("kill", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: pid can't be empty\nUsage: kill pid\n");
@@ -229,28 +244,11 @@ int main(void) {
             default:
                 printf("Internal Error\n");
             }
-        } else if (strcmp("help", argv[0]) == 0) {
-            printf("--- HELP START ---\n");
-            printf("  ps: show processes\n");
-            printf("  clear: clear screen\n");
-            printf("  exec name [arg0] ...: start a new process\n");
-            printf("  exit: exit shell\n");
-            printf("  kill pid: kill a existing process\n");
-            printf("  help: print this help message\n");
-            printf("  history: show cmd history\n");
-            printf("  ts: show tasks\n");
-            printf("  taskset -p mask pid / taskset mask name [arg0] ...: set pid's mask\n");
-            printf("  shortcut keys:\n");
-            printf("     Ctrl+C: clear line\n");
-            printf("     Ctrl+D: exit shell\n");
-            printf("     Ctrl+L: clear screen\n");
-            printf("---- HELP END ----\n");
-        } else if (strcmp("history", argv[0]) == 0) {
-            for (int i=0; i<HISTSIZE; i++) {
-                printf("[%02d] %s\n", i, history[(i + hp) % HISTSIZE]);
-            }
-        } else if (strcmp("ts", argv[0]) == 0) {
-            sys_show_task();
+        } else if (strcmp("ps", argv[0]) == 0) {
+            int mode = 0;
+            if (argc >= 2 && strcmp("-v", argv[1]) == 0)
+                mode = 1;
+            sys_ps(mode);
 #ifndef S_CORE_P3
         } else if (strcmp("taskset", argv[0]) == 0) {
             unsigned mask;
@@ -266,6 +264,8 @@ int main(void) {
             sys_taskset(pid, mask);
             printf("Set pid=%d's mask=0x%04x\n", pid, mask);
 #endif
+        } else if (strcmp("ts", argv[0]) == 0) {
+            sys_show_task();
         } else {
             printf("Command \"%s\" not found\n", buf);
         }
