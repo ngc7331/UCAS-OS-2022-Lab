@@ -116,6 +116,9 @@ void init_fs(void) {
         logging(LOG_WARNING, "init", "No fs found on disk, run mkfs\n");
         do_mkfs();
     }
+
+    // if fs loaded, root dir's ino must bt 0
+    current_ino = 0;
 }
 
 int do_mkfs(void) {
