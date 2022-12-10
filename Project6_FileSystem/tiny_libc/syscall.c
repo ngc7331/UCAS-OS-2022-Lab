@@ -282,3 +282,94 @@ int sys_net_send(void *txpacket, int length) {
 int sys_net_recv(void *rxbuffer, int pkt_num, int *pkt_lens) {
     return invoke_syscall(SYSCALL_NET_RECV, (long) rxbuffer, pkt_num, (long) pkt_lens, IGNORE, IGNORE);
 }
+
+int sys_mkfs(void)
+{
+    // TODO [P6-task1]: Implement sys_mkfs
+    return 0;  // sys_mkfs succeeds
+}
+
+int sys_statfs(void)
+{
+    // TODO [P6-task1]: Implement sys_statfs
+    return 0;  // sys_statfs succeeds
+}
+
+int sys_cd(char *path)
+{
+    // TODO [P6-task1]: Implement sys_cd
+    return 0;  // sys_cd succeeds
+}
+
+int sys_mkdir(char *path)
+{
+    // TODO [P6-task1]: Implement sys_mkdir
+    return 0;  // sys_mkdir succeeds
+}
+
+int sys_rmdir(char *path)
+{
+    // TODO [P6-task1]: Implement sys_rmdir
+    return 0;  // sys_rmdir succeeds
+}
+
+int sys_ls(char *path, int option)
+{
+    // TODO [P6-task1]: Implement sys_ls
+    // Note: argument 'option' serves for 'ls -l' in A-core
+    return 0;  // sys_ls succeeds
+}
+
+int sys_touch(char *path)
+{
+    // TODO [P6-task2]: Implement sys_touch
+    return 0;  // sys_touch succeeds
+}
+
+int sys_cat(char *path)
+{
+    // TODO [P6-task2]: Implement sys_cat
+    return 0;  // sys_cat succeeds
+}
+
+int sys_fopen(char *path, int mode)
+{
+    // TODO [P6-task2]: Implement sys_fopen
+    return 0;  // return the id of file descriptor
+}
+
+int sys_fread(int fd, char *buff, int length)
+{
+    // TODO [P6-task2]: Implement sys_fread
+    return 0;  // return the length of trully read data
+}
+
+int sys_fwrite(int fd, char *buff, int length)
+{
+    // TODO [P6-task2]: Implement sys_fwrite
+    return 0;  // return the length of trully written data
+}
+
+int sys_fclose(int fd)
+{
+    // TODO [P6-task2]: Implement sys_fclose
+    return 0;  // sys_fclose succeeds
+}
+
+int sys_ln(char *src_path, char *dst_path)
+{
+    // TODO [P6-task2]: Implement sys_ln
+    return 0;  // sys_ln succeeds 
+}
+
+int sys_rm(char *path)
+{
+    // TODO [P6-task2]: Implement sys_rm
+    return 0;  // sys_rm succeeds 
+}
+
+int sys_lseek(int fd, int offset, int whence)
+{
+    // TODO [P6-task2]: Implement sys_lseek
+    return 0;  // the resulting offset location from the beginning of the file
+}

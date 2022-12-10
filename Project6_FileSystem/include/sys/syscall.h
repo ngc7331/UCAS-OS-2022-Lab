@@ -32,7 +32,7 @@
 #include <os/sched.h>
 #include <type.h>
 
-#define NUM_SYSCALLS 80
+#define NUM_SYSCALLS 96
 
 /* syscall function pointer */
 extern long (*syscall[NUM_SYSCALLS])();

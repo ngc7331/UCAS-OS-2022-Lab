@@ -160,6 +160,8 @@ int main(void) {
         } while (*pbuf);
 
         // commands
+        // TODO [P6-task1]: mkfs, statfs, cd, mkdir, rmdir, ls
+        // TODO [P6-task2]: touch, cat, ln, ls -l, rm
         if (strcmp("ps", argv[0]) == 0) {
             int mode = 0;
             if (argc >= 2 && strcmp("-v", argv[1]) == 0)
