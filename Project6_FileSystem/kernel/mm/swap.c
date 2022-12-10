@@ -1,3 +1,5 @@
+#include <assert.h>
+#include <os/fs.h>
 #include <os/kernel.h>
 #include <os/mm.h>
 #include <os/pthread.h>
@@ -12,6 +14,10 @@ unsigned int allocDBlock(int numBlock)
     static unsigned int diskptr = 0;  // block id
     if (diskptr == 0)
         diskptr = (*((long *) TASK_INFO_P_LOC) + (appnum + batchnum) * sizeof(task_info_t)) / SECTOR_SIZE + 1;
+    else if (diskptr >= FS_START) {
+        logging(LOG_CRITICAL, "swap", "no swap space avaliable\n");
+        assert(0);
+    }
     // align PAGE_SIZE
     unsigned int ret = diskptr;
     diskptr = ret + numBlock;
