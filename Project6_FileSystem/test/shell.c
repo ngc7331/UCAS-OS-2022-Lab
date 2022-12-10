@@ -160,9 +160,14 @@ int main(void) {
         } while (*pbuf);
 
         // commands
-        // TODO [P6-task1]: mkfs, statfs, cd, mkdir, rmdir, ls
         // TODO [P6-task2]: touch, cat, ln, ls -l, rm
-        if (strcmp("clear", argv[0]) == 0) {
+        if (strcmp("cd", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: cd path\n");
+                continue;
+            }
+            sys_cd(argv[1]);
+        } else if (strcmp("clear", argv[0]) == 0) {
             init_shell();
         } else if (strcmp("exec", argv[0]) == 0) {
             int bg = argv[argc-1][0] == '&' && argv[argc-1][1] == '\0';
@@ -244,11 +249,42 @@ int main(void) {
             default:
                 printf("Internal Error\n");
             }
+        } else if (strcmp("ls", argv[0]) == 0) {
+            char *path = NULL;
+            char *default_path = ".";
+            if (argc == 1 || (argc == 2 && argv[1][0] == '-')) {
+                path = default_path;
+            } else if (argc == 2) {
+                path = argv[1];
+            } else if (argc == 3 && argv[1][0] == '-') {
+                path = argv[2];
+            } else {
+                printf("Error: invalid arguments\nUsage: ls [-al] [path]\n");
+                continue;
+            }
+            // FIXME: support -a, -l, -al, -la
+            sys_ls(path, 0);
+        } else if (strcmp("mkdir", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: mkdir path\n");
+                continue;
+            }
+            sys_mkdir(argv[1]);
+        } else if (strcmp("mkfs", argv[0]) == 0) {
+            sys_mkfs();
         } else if (strcmp("ps", argv[0]) == 0) {
             int mode = 0;
             if (argc >= 2 && strcmp("-v", argv[1]) == 0)
                 mode = 1;
             sys_ps(mode);
+        } else if (strcmp("rmdir", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: rmdir path\n");
+                continue;
+            }
+            sys_rmdir(argv[1]);
+        } else if (strcmp("statfs", argv[0]) == 0) {
+            sys_statfs();
 #ifndef S_CORE_P3
         } else if (strcmp("taskset", argv[0]) == 0) {
             unsigned mask;
