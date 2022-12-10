@@ -316,7 +316,7 @@ int logging(loglevel_t level, const char* name, const char *fmt, ...)
 #else
     if (level < __level) return -1;
     char buf[42];
-    char __dict[8] = "VVDIWEC";
+    char __dict[9] = "VVDIWECI";
     int ret;
     va_list va;
 

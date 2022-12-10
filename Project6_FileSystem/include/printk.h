@@ -10,7 +10,8 @@ typedef enum {
     LOG_INFO,
     LOG_WARNING,
     LOG_ERROR,
-    LOG_CRITICAL
+    LOG_CRITICAL,
+    LOG_MAN
 } loglevel_t;
 
 /* kernel print */
