@@ -36,11 +36,23 @@ typedef struct superblock_t {
 } superblock_t;
 
 typedef struct dentry_t {
-    // TODO [P6-task1]: Implement the data structure of directory entry
+    // NOTE: BLOCK_SIZE_BYTE must be divisible by sizeof(this)
+    char name[56];
+    int ino;
+    int valid;
 } dentry_t;
 
+#define DIRECT_BLOCK_NUM 12
 typedef struct inode_t {
-    // TODO [P6-task1]: Implement the data structure of inode
+    // NOTE: BLOCK_SIZE_BYTE must be divisible by sizeof(this)
+    enum {
+        INODE_FILE,
+        INODE_DIR
+    } type;
+    int link;
+    int size;
+    int direct_blocks[DIRECT_BLOCK_NUM];
+    int indirect_block;
 } inode_t;
 
 typedef struct fdesc_t {
