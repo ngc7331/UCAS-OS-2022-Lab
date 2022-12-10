@@ -9,6 +9,9 @@
 #define BUFSIZE 64
 #define HISTSIZE 16
 
+#define LS_OPTIONS_L 0x1
+#define LS_OPTIONS_A 0x2
+
 pid_t self;
 char history[HISTSIZE][BUFSIZE];
 int hp = 0;
@@ -252,6 +255,7 @@ int main(void) {
         } else if (strcmp("ls", argv[0]) == 0) {
             char *path = NULL;
             char *default_path = ".";
+            int option = 0;
             if (argc == 1 || (argc == 2 && argv[1][0] == '-')) {
                 path = default_path;
             } else if (argc == 2) {
@@ -262,8 +266,16 @@ int main(void) {
                 printf("Error: invalid arguments\nUsage: ls [-al] [path]\n");
                 continue;
             }
-            // FIXME: support -a, -l, -al, -la
-            sys_ls(path, 0);
+            if (argc >= 2 && argv[1][0] == '-') {
+                for (char *p=argv[1]+1; *p; p++)
+                    if (*p == 'a')
+                        option |= LS_OPTIONS_A;
+                    else if (*p == 'l')
+                        option |= LS_OPTIONS_L;
+                    else
+                        printf("Error: invalid option '%c'\n", *p);
+            }
+            sys_ls(path, option);
         } else if (strcmp("mkdir", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: path can't be empty\nUsage: mkdir path\n");
