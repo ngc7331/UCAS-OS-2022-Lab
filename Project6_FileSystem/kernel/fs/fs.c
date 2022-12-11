@@ -466,9 +466,15 @@ int do_rmdir(char *path) {
 
     if (success) {
         // pino's link --
-        inode = get_inode(pino);
         inode->link --;
         write_inode(pino);
+
+        // remove ino's blocks
+        for (int i=0; i<DIRECT_BLOCK_NUM; i++) {
+            if (inode->direct_blocks[i] == -1)
+                break;
+            free_block(inode->direct_blocks[i]);
+        }
 
         free_inode(ino);
 
