@@ -426,6 +426,11 @@ int do_rmdir(char *path) {
         return -1;
     }
 
+    if (strcmp(name, ".") == 0) {
+        logging(LOG_ERROR, "fs", "rmdir: cannot remove \".\"\n");
+        return -1;
+    }
+
     inode_t *inode = get_inode(ino);
     // not dir
     if (inode->type != INODE_DIR) {
@@ -466,6 +471,12 @@ int do_rmdir(char *path) {
         write_inode(pino);
 
         free_inode(ino);
+
+        // current is removed, cd to parent
+        if (ino == current_ino) {
+            logging(LOG_DEBUG, "fs", "... current is removed, cd to parent\n");
+            current_ino = pino;
+        }
 
         // write superblock
         write_superblock();
