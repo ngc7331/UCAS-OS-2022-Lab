@@ -331,10 +331,6 @@ int do_mkdir(char *path) {
     int pino;
     int ino = parse_path(path, &name, &pino);
 
-    if (ino == 0) {
-        logging(LOG_ERROR, "fs", "mkdir: cannot mkdir root dir\n");
-        return -1;
-    }
     // parent dir not found
     if (pino == -1) {
         logging(LOG_ERROR, "fs", "mkdir: invalid path \"%s\"\n", path);
@@ -342,7 +338,7 @@ int do_mkdir(char *path) {
     }
     // name already exists
     if (ino != -1) {
-        logging(LOG_ERROR, "fs", "mkdir: \"%s\" already exists\n", name);
+        logging(LOG_ERROR, "fs", "mkdir: \"%s\" already exists\n", ino==0 ? "/" : name);
         return -1;
     }
 
