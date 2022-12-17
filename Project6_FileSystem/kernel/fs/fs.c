@@ -191,11 +191,11 @@ static void _mkdentry(int ino, int pino, int tp) {
     inode->direct_blocks[0] = dir_block;
     for (int i=1; i<DIRECT_BLOCK_NUM; i++)
         inode->direct_blocks[i] = -1;
-    for (int i=1; i<INDIRECT_BLOCK_L1_NUM; i++)
+    for (int i=0; i<INDIRECT_BLOCK_L1_NUM; i++)
         inode->indirect_blocks_l1[i] = -1;
-    for (int i=1; i<INDIRECT_BLOCK_L2_NUM; i++)
+    for (int i=0; i<INDIRECT_BLOCK_L2_NUM; i++)
         inode->indirect_blocks_l2[i] = -1;
-    for (int i=1; i<INDIRECT_BLOCK_L3_NUM; i++)
+    for (int i=0; i<INDIRECT_BLOCK_L3_NUM; i++)
         inode->indirect_blocks_l3[i] = -1;
     write_inode(ino);
 
@@ -596,6 +596,126 @@ int do_touch(char *path) {
     return do_mkdentry(path, INODE_FILE);
 }
 
+static int find_indirect_block(int parent, int block_no, int level, int new_block) {
+    logging(LOG_VERBOSE, "fs", "... find_indirect_block(parent=0x%x, block_no=%d, level=%d, new_block=%d)\n", parent, block_no, level, new_block);
+    int addr_num_per_block = BLOCK_SIZE_BYTE/sizeof(int);
+    if (level == 0) {
+        int *indirect_block = (int *) get_block(parent);
+        if (new_block != -1) {
+            if (indirect_block[block_no] != -1) {
+                logging(LOG_WARNING, "fs", "overwrite indirect block");
+            }
+            indirect_block[block_no] = new_block;
+            write_block(parent);
+        }
+        return indirect_block[block_no];
+    }
+
+    int addr_num_per_block_pow = 1;
+    for (int i=0; i<level; i++)
+        addr_num_per_block_pow *= addr_num_per_block;
+    int no = block_no / addr_num_per_block_pow;
+
+    int *indirect_block = (int *) get_block(parent);
+    // if lower-level indirect block not exist, create it
+    if (indirect_block[no] == -1) {
+        if (new_block == -1)
+            return -1;
+        int new_indirect_block = alloc_block();
+        indirect_block[no] = new_indirect_block;
+        write_block(parent);
+        indirect_block = (int *) get_block(new_indirect_block);
+        for (int i=0; i<addr_num_per_block; i++)
+            indirect_block[i] = -1;
+        write_block(new_indirect_block);
+        indirect_block = get_block(parent);
+        logging(LOG_VERBOSE, "fs", "... create new l%d indirect block at %d\n", level, new_indirect_block);
+    }
+
+    return find_indirect_block(indirect_block[no], block_no % addr_num_per_block_pow, level-1, new_block);
+}
+
+static int find_block(inode_t *inode, int block_no, int new_block) {
+    logging(LOG_VERBOSE, "fs", "... find_block(inode=0x%x, block_no=%d, new_block=%d)\n", inode, block_no, new_block);
+    // NOTE: must write_inode after find_block() if new_block != -1
+    // direct block
+    if (block_no < DIRECT_BLOCK_NUM) {
+        if (new_block != -1)
+            inode->direct_blocks[block_no] = new_block;
+        return inode->direct_blocks[block_no];
+    }
+
+    // indirect block
+    int addr_num_per_block = BLOCK_SIZE_BYTE/sizeof(int);
+    // l1
+    block_no -= DIRECT_BLOCK_NUM;
+    int l1_blk_num = INDIRECT_BLOCK_L1_NUM * addr_num_per_block;
+    if (block_no < l1_blk_num) {
+        // find l1 block
+        int no = block_no / addr_num_per_block;
+        // ensure l1 block exist
+        if (inode->indirect_blocks_l1[no] == -1) {
+            if (new_block == -1)
+                return -1;
+            logging(LOG_VERBOSE, "fs", "... create new l1 indirect block\n");
+            int new_indirect_block = alloc_block();
+            inode->indirect_blocks_l1[no] = new_indirect_block;
+            int *indirect_block = (int *) get_block(new_indirect_block);
+            for (int i=0; i<addr_num_per_block; i++)
+                indirect_block[i] = -1;
+            write_block(new_indirect_block);
+        }
+        logging(LOG_VERBOSE, "fs", "... find l1 indirect block no=%d\n");
+        // find block and return
+        return find_indirect_block(inode->indirect_blocks_l1[no], block_no % addr_num_per_block, 0, new_block);
+    }
+    block_no -= l1_blk_num;
+    int l2_blk_num = INDIRECT_BLOCK_L2_NUM * addr_num_per_block * addr_num_per_block;
+    if (block_no < l2_blk_num) {
+        // find l2 block
+        int no = block_no / (addr_num_per_block * addr_num_per_block);
+        // ensure l2 block exist
+        if (inode->indirect_blocks_l2[no] == -1) {
+            if (new_block == -1)
+                return -1;
+            logging(LOG_VERBOSE, "fs", "... create new l2 indirect block\n");
+            int new_indirect_block = alloc_block();
+            inode->indirect_blocks_l2[no] = new_indirect_block;
+            int *indirect_block = (int *) get_block(new_indirect_block);
+            for (int i=0; i<addr_num_per_block; i++)
+                indirect_block[i] = -1;
+            write_block(new_indirect_block);
+        }
+        logging(LOG_VERBOSE, "fs", "... find l2 indirect block no=%d\n");
+        // find block and return
+        return find_indirect_block(inode->indirect_blocks_l2[no], block_no % (addr_num_per_block * addr_num_per_block), 1, new_block);
+    }
+    block_no -= l2_blk_num;
+    int l3_blk_num = INDIRECT_BLOCK_L3_NUM * addr_num_per_block * addr_num_per_block * addr_num_per_block;
+    if (block_no < l3_blk_num) {
+        // find l3 block
+        int no = block_no / (addr_num_per_block * addr_num_per_block * addr_num_per_block);
+        // ensure l3 block exist
+        if (inode->indirect_blocks_l3[no] == -1) {
+            if (new_block == -1)
+                return -1;
+            logging(LOG_VERBOSE, "fs", "... create new l3 indirect block\n");
+            int new_indirect_block = alloc_block();
+            inode->indirect_blocks_l3[no] = new_indirect_block;
+            int *indirect_block = (int *) get_block(new_indirect_block);
+            for (int i=0; i<addr_num_per_block; i++)
+                indirect_block[i] = -1;
+            write_block(new_indirect_block);
+        }
+        // find block and return
+        logging(LOG_VERBOSE, "fs", "... find l3 indirect block no=%d\n");
+        return find_indirect_block(inode->indirect_blocks_l3[no], block_no % (addr_num_per_block * addr_num_per_block * addr_num_per_block), 2, new_block);
+    }
+
+    // out of range
+    return -1;
+}
+
 int do_cat(char *path) {
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "cat: no file system found\n");
@@ -613,13 +733,14 @@ int do_cat(char *path) {
     int block_no = 0;
 
     while (remain > 0) {
-        if (inode->direct_blocks[block_no] == -1) {
+        int bno = find_block(inode, block_no, -1);
+        if (bno == -1) {
             logging(LOG_WARNING, "fs", "... no more block to read\n");
             break;
         }
-        char *block = get_block(inode->direct_blocks[block_no]);
+        char *block = get_block(bno);
         int len = remain > PAGE_SIZE ? PAGE_SIZE : remain;
-        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, inode->direct_blocks[block_no]);
+        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, bno);
 
         for (int i=0; i<len; i++)
             printk("%c", block[i]);
@@ -731,15 +852,18 @@ int do_fread(int fd, char *buff, int length) {
     int offset = fdesc_array[fd].rp % BLOCK_SIZE_BYTE;
     inode_t *inode = get_inode(fdesc_array[fd].ino);
 
+    logging(LOG_DEBUG, "fs", "... block_no=%d, offset=%d\n", block_no, offset);
+
     while (remain > 0) {
-        if (inode->direct_blocks[block_no] == -1) {
+        int bno = find_block(inode, block_no, -1);
+        if (bno == -1) {
             logging(LOG_WARNING, "fs", "... no more block to read\n");
             return length - remain;
         }
-        char *block = get_block(inode->direct_blocks[block_no]);
+        char *block = get_block(bno);
         int len = remain > BLOCK_SIZE_BYTE - offset ? BLOCK_SIZE_BYTE - offset : remain;
         memcpy((uint8_t *) buff, (uint8_t *) block + offset, len);
-        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, inode->direct_blocks[block_no]);
+        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, bno);
 
         block_no += 1;
         buff += len;
@@ -747,8 +871,6 @@ int do_fread(int fd, char *buff, int length) {
         remain -= BLOCK_SIZE_BYTE - offset;
         offset = 0;
     }
-
-    // TODO: support indirect blocks
 
     return length;  // return the length of trully read data
 }
@@ -777,23 +899,27 @@ int do_fwrite(int fd, char *buff, int length) {
     int offset = fdesc_array[fd].wp % BLOCK_SIZE_BYTE;
     inode_t *inode = get_inode(fdesc_array[fd].ino);
 
+    logging(LOG_DEBUG, "fs", "... block_no=%d, offset=%d\n", block_no, offset);
+
     while (remain > 0) {
-        if (inode->direct_blocks[block_no] == -1) {
+        int bno = find_block(inode, block_no, -1);
+        if (bno == -1) {
             // new block needed
             int new_block = alloc_block();
             if (new_block == -1) {
                 logging(LOG_ERROR, "fs", "fwrite: no free block\n");
                 break;
             }
-            inode->direct_blocks[block_no] = new_block;
+            // write new block to inode
+            bno = find_block(inode, block_no, new_block);
             logging(LOG_DEBUG, "fs", "... alloc block %d for inode %d\n", new_block, fdesc_array[fd].ino);
         }
         // write data to block
-        char *block = get_block(inode->direct_blocks[block_no]);
+        char *block = get_block(bno);
         int len = remain > BLOCK_SIZE_BYTE - offset ? BLOCK_SIZE_BYTE - offset : remain;
         memcpy((uint8_t *) (block + offset), (uint8_t *) buff, len);
-        write_block(inode->direct_blocks[block_no]);
-        logging(LOG_DEBUG, "fs", "... write %d bytes to block %d\n", len, inode->direct_blocks[block_no]);
+        write_block(bno);
+        logging(LOG_DEBUG, "fs", "... write %d bytes to block %d\n", len, bno);
 
         block_no += 1;
         buff += len;
@@ -801,8 +927,6 @@ int do_fwrite(int fd, char *buff, int length) {
         remain -= BLOCK_SIZE_BYTE - offset;
         offset = 0;
     }
-
-    // TODO: support indirect blocks
 
     inode->size = max(fdesc_array[fd].wp, inode->size);
     write_inode(fdesc_array[fd].ino);
