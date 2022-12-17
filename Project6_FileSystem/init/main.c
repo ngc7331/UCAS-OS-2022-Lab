@@ -197,6 +197,8 @@ void init_shell(void) {
 #endif
 }
 
+#define ENABLE_NET
+
 int main(void) {
     if (get_current_cpu_id() == 0) {
         // for master core
