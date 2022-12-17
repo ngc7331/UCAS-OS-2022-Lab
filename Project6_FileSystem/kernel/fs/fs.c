@@ -589,6 +589,10 @@ int do_ls(char *path, int option) {
 }
 
 int do_touch(char *path) {
+    if (path[strlen(path)-1] == '/') {
+        logging(LOG_ERROR, "fs", "touch: file name cannot end with \"/\"");
+        return -1;
+    }
     return do_mkdentry(path, INODE_FILE);
 }
 
@@ -639,7 +643,7 @@ int do_fopen(char *path, int mode) {
     }
 
     if (path[strlen(path)-1] == '/') {
-        logging(LOG_ERROR, "fs", "fopen: file path can't end with '/'\n");
+        logging(LOG_ERROR, "fs", "fopen: file name cannot end with \"/\"\n");
         return -1;
     }
 
@@ -830,21 +834,163 @@ int do_fclose(int fd) {
 }
 
 int do_ln(char *src_path, char *dst_path) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do ln\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... src=\"%s\", dst=\"%s\"\n", src_path, dst_path);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "ln: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_ln
+
+    if (src_path[strlen(src_path)-1] == '/' || dst_path[strlen(dst_path)-1] == '/') {
+        logging(LOG_ERROR, "fs", "ln: cannot create hard link for directory\n");
+        return -1;
+    }
+
+    int src_ino = path_lookup(src_path, NULL, NULL);
+    int pino;
+    char *name;
+    int ino = path_lookup(dst_path, &name, &pino);
+
+    // src not found
+    if (src_ino == -1) {
+        logging(LOG_ERROR, "fs", "ln: invalid src_path \"%s\"\n", src_path);
+        return -1;
+    }
+    // dst parent dir not found
+    if (pino == -1) {
+        logging(LOG_ERROR, "fs", "ln: invalid dst_path \"%s\"\n", dst_path);
+        return -1;
+    }
+    // dst name already exists
+    if (ino != -1) {
+        logging(LOG_ERROR, "fs", "ln: \"%s\" already exists\n", ino==0 ? "/" : name);
+        return -1;
+    }
+
+    inode_t *inode = get_inode(src_ino);
+    inode->link ++;
+    write_inode(src_ino);
+
+    // find a invalid dentry and ln
+    int success = 0;
+    logging(LOG_INFO, "fs", "... ln \"%s\" in inode=%d\n", name, pino);
+    for (int i=0; i<DIRECT_BLOCK_NUM && !success; i++) {
+        inode_t *inode = get_inode(pino);
+        dentry_t *dentry;
+        if (inode->direct_blocks[i] == -1) {
+            // all blocks are full, alloc a new block
+            inode->direct_blocks[i] = alloc_block();
+            logging(LOG_VERBOSE, "fs", "... all direct blocks full, alloc a new one\n");
+            inode->size += 4096;
+            write_inode(pino);
+            // clear the new block
+            memset((void *) buf[0], 0, BLOCK_SIZE_BYTE);
+            dentry = (dentry_t *) buf[0];
+        } else {
+            dentry = (dentry_t *) get_block(inode->direct_blocks[i]);
+        }
+        logging(LOG_VERBOSE, "fs", "... searching direct_blocks[%d] at %d\n", i, inode->direct_blocks[i]);
+        for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(dentry_t); j++) {
+            if (!dentry[j].valid) {
+                logging(LOG_VERBOSE, "fs", "... found empty entry at %d\n", j);
+                dentry[j].valid = 1;
+                dentry[j].ino = src_ino;
+                strcpy(dentry[j].name, name);
+                write_block(inode->direct_blocks[i]);
+                success = 1;
+                break;
+            }
+        }
+    }
 
     return 0;  // do_ln succeeds
 }
 
 int do_rm(char *path) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do rm\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... path=\"%s\"\n", path);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "rm: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_rm
+
+    if (path[strlen(path)-1] == '/') {
+        logging(LOG_ERROR, "fs", "rm: file name cannot end with \"/\"\n");
+        return -1;
+    }
+
+    // get path's ino
+    char *name;
+    int pino;
+    int ino = path_lookup(path, &name, &pino);
+    logging(LOG_DEBUG, "fs", "... ino=0x%x\n", ino);
+
+    if (pino == -1 || ino == -1) {
+        logging(LOG_ERROR, "fs", "rm: path not found\n");
+        return -1;
+    }
+
+    inode_t *inode = get_inode(ino);
+    // not file
+    if (inode->type != INODE_FILE) {
+        logging(LOG_ERROR, "fs", "rm: is not file\n");
+        return -1;
+    }
+
+    // link --
+    inode->link --;
+    write_inode(ino);
+    int remove = inode->link == 0;
+
+    // find ino's dentry in dino
+    int success = 0;
+    logging(LOG_INFO, "fs", "... rmdir \"%s\" in inode=%d\n", name, pino);
+    inode = get_inode(pino);
+    for (int i=0; i<DIRECT_BLOCK_NUM && !success; i++) {
+        if (inode->direct_blocks[i] == -1)
+            break;
+        dentry_t *dentry = (dentry_t *) get_block(inode->direct_blocks[i]);
+        logging(LOG_DEBUG, "fs", "... searching direct_blocks[%d] at %d\n", i, inode->direct_blocks[i]);
+        for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(dentry_t); j++) {
+            if (dentry[j].valid && dentry[j].ino == ino) {
+                logging(LOG_DEBUG, "fs", "... found entry at %d\n", j);
+                dentry[j].valid = 0;
+                write_block(inode->direct_blocks[i]);
+                success = 1;
+                break;
+            }
+        }
+    }
+
+    if (success) {
+        if (remove) {
+            // pino's link --
+            inode->link --;
+            write_inode(pino);
+
+            // remove ino's blocks
+            inode = get_inode(ino);
+            for (int i=0; i<DIRECT_BLOCK_NUM; i++) {
+                if (inode->direct_blocks[i] != -1)
+                    free_block(inode->direct_blocks[i]);
+                // TODO: support indirect blocks
+            }
+
+            free_inode(ino);
+
+            // write superblock
+            write_superblock();
+        }
+
+        return 0;  // do_rmdir succeeds
+    } else {
+        logging(LOG_ERROR, "fs", "rm failed\n");
+        return -1;
+    }
 
     return 0;  // do_rm succeeds
 }

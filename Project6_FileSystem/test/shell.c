@@ -163,7 +163,6 @@ int main(void) {
         } while (*pbuf);
 
         // commands
-        // TODO [P6-task2]: ln, rm
         if (strcmp("cd", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: path can't be empty\nUsage: cd path\n");
@@ -258,6 +257,12 @@ int main(void) {
             default:
                 printf("Internal Error\n");
             }
+        } else if (strcmp("ln", argv[0]) == 0) {
+            if (argc < 3) {
+                printf("Error: path can't be empty\nUsage: ln src_path dst_path\n");
+                continue;
+            }
+            sys_ln(argv[1], argv[2]);
         } else if (strcmp("ls", argv[0]) == 0) {
             char *path = NULL;
             char *default_path = ".";
@@ -295,6 +300,12 @@ int main(void) {
             if (argc >= 2 && strcmp("-v", argv[1]) == 0)
                 mode = 1;
             sys_ps(mode);
+        } else if (strcmp("rm", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: rm path\n");
+                continue;
+            }
+            sys_rm(argv[1]);
         } else if (strcmp("rmdir", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: path can't be empty\nUsage: rmdir path\n");
