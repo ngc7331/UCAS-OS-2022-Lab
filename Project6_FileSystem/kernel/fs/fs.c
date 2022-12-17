@@ -595,13 +595,52 @@ int do_cat(char *path) {
 }
 
 int do_fopen(char *path, int mode) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do fopen\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... path=\"%s\", mode=%d\n", path, mode);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "fopen: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_fopen
 
-    return 0;  // return the id of file descriptor
+    if (path[strlen(path)-1] == '/') {
+        logging(LOG_ERROR, "fs", "fopen: file path can't end with '/'\n");
+        return -1;
+    }
+
+    int ino = path_lookup(path, NULL, NULL);
+    if (ino == -1) {
+        logging(LOG_ERROR, "fs", "fopen: path not found\n");
+        return -1;
+    }
+
+    inode_t *inode = get_inode(ino);
+    if (inode->type != INODE_FILE) {
+        logging(LOG_ERROR, "fs", "fopen: not a file\n");
+        return -1;
+    }
+
+    for (int i=0; i<NUM_FDESCS; i++) {
+        if (fdesc_array[i].ino == ino) {
+            logging(LOG_ERROR, "fs", "fopen: file already opened\n");
+            return -1;
+        }
+    }
+
+    for (int i=0; i<NUM_FDESCS; i++) {
+        if (fdesc_array[i].ino == -1) {
+            fdesc_array[i].ino = ino;
+            fdesc_array[i].cur = 0;
+            fdesc_array[i].mode = mode;
+            fdesc_array[i].owner = self->pid;
+            logging(LOG_INFO, "fs", "... fd=%d\n", i);
+            return i;
+        }
+    }
+
+    logging(LOG_ERROR, "fs", "fopen: no free fd\n");
+    return -1;
 }
 
 int do_fread(int fd, char *buff, int length) {
@@ -625,11 +664,30 @@ int do_fwrite(int fd, char *buff, int length) {
 }
 
 int do_fclose(int fd) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do fclose\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... fd=%d\n", fd);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "fclose: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_fclose
+
+    if (fd < 0 || fd >= NUM_FDESCS) {
+        logging(LOG_ERROR, "fs", "fclose: invalid fd\n");
+        return -1;
+    }
+    if (fdesc_array[fd].ino == -1) {
+        logging(LOG_ERROR, "fs", "fclose: fd not opened\n");
+        return -1;
+    }
+    if (fdesc_array[fd].owner != self->pid) {
+        logging(LOG_ERROR, "fs", "fclose: fd not owned by current process\n");
+        return -1;
+    }
+
+    fdesc_array[fd].ino = -1;
+    logging(LOG_INFO, "fs", "... closed\n", fd);
 
     return 0;  // do_fclose succeeds
 }

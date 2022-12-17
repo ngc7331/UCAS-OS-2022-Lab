@@ -61,11 +61,10 @@ typedef struct inode_t {
 } inode_t;
 
 typedef struct fdesc_t {
-    // TODO [P6-task2]: Implement the data structure of file descriptor
     int ino;
     int cur;
-    int size;
     int mode;
+    pid_t owner;
 } fdesc_t;
 
 /* modes of do_fopen */
