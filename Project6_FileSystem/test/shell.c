@@ -312,6 +312,12 @@ int main(void) {
             sys_taskset(pid, mask);
             printf("Set pid=%d's mask=0x%04x\n", pid, mask);
 #endif
+        } else if (strcmp("touch", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: touch path\n");
+                continue;
+            }
+            sys_touch(argv[1]);
         } else if (strcmp("ts", argv[0]) == 0) {
             sys_show_task();
         } else {

@@ -97,9 +97,9 @@ static void write_block(int block) {
     write_buf(superblock.data_offset + block, 0);
 }
 
-static int parse_path(char *path, char **name, int *pino) {
+static int path_lookup(char *path, char **name, int *pino) {
     if (strlen(path) == 0) {
-        logging(LOG_WARNING, "fs", "path empty, returning root dir\n");
+        logging(LOG_WARNING, "fs", "path empty, returning root directory\n");
         return 0;
     }
     // NOTE: path shall not ends with '/'
@@ -128,6 +128,11 @@ static int parse_path(char *path, char **name, int *pino) {
             // search ino's direct blocks
             for (int i=0; i<DIRECT_BLOCK_NUM && !found; i++) {
                 inode_t *inode = get_inode(ino);
+                if (inode->type != INODE_DIR) {
+                    logging(LOG_ERROR, "fs", "path_lookup: ino=%d is not a directory\n", ino);
+                    *pino = -1;
+                    return -1;
+                }
                 if (inode->direct_blocks[i] == -1)
                     break;
                 dentry_t *dentry = (dentry_t *) get_block(inode->direct_blocks[i]);
@@ -161,9 +166,14 @@ static int parse_path(char *path, char **name, int *pino) {
     return ino;
 }
 
-static void _mkdir(int ino, int pino) {
-    int dir_block = alloc_block();
-    logging(LOG_VERBOSE, "fs", "mkdir for ino=0x%x, pino=0x%x, block=0x%x\n", ino, pino, dir_block);
+static void _mkdentry(int ino, int pino, int tp) {
+    int dir_block = -1;
+    if (tp == INODE_DIR) {
+        dir_block = alloc_block();
+        logging(LOG_VERBOSE, "fs", "mkdir for ino=0x%x, pino=0x%x, block=0x%x\n", ino, pino, dir_block);
+    } else {
+        logging(LOG_VERBOSE, "fs", "mkfile for ino=0x%x, pino=0x%x\n", ino, pino);
+    }
     // pino's link + 1
     inode_t *inode = get_inode(pino);
     inode->link ++;
@@ -171,26 +181,33 @@ static void _mkdir(int ino, int pino) {
 
     // set ino
     inode = get_inode(ino);
-    inode->type = INODE_DIR;
-    inode->link = 1;
-    inode->size = BLOCK_SIZE_BYTE;
+    inode->type = tp;
+    inode->link = tp == INODE_DIR ? 2 : 1;  // dir always has at least 2 link(self->self, parent->self), and file has 1 (parent->self)
+    inode->size = tp == INODE_DIR ? BLOCK_SIZE_BYTE : 0;  // dir always has at least 1 block(. and ..)
     inode->direct_blocks[0] = dir_block;
     for (int i=1; i<DIRECT_BLOCK_NUM; i++)
         inode->direct_blocks[i] = -1;
-    inode->indirect_block = -1;
+    for (int i=1; i<INDIRECT_BLOCK_L1_NUM; i++)
+        inode->indirect_blocks_l1[i] = -1;
+    for (int i=1; i<INDIRECT_BLOCK_L2_NUM; i++)
+        inode->indirect_blocks_l2[i] = -1;
+    for (int i=1; i<INDIRECT_BLOCK_L3_NUM; i++)
+        inode->indirect_blocks_l3[i] = -1;
     write_inode(ino);
 
-    // set default dentries
-    dentry_t *dentry = (dentry_t *) get_block(dir_block);
-    dentry[0].ino = ino;
-    dentry[0].valid = 1;
-    strcpy(dentry[0].name, ".");
-    dentry[1].ino = pino;
-    dentry[1].valid = 1;
-    strcpy(dentry[1].name, "..");
-    for (int i=2; i<BLOCK_SIZE_BYTE/sizeof(dentry_t); i++)
-        dentry[i].valid = 0;
-    write_block(dir_block);
+    if (tp == INODE_DIR) {
+        // set default dentries
+        dentry_t *dentry = (dentry_t *) get_block(dir_block);
+        dentry[0].ino = ino;
+        dentry[0].valid = 1;
+        strcpy(dentry[0].name, ".");
+        dentry[1].ino = pino;
+        dentry[1].valid = 1;
+        strcpy(dentry[1].name, "..");
+        for (int i=2; i<BLOCK_SIZE_BYTE/sizeof(dentry_t); i++)
+            dentry[i].valid = 0;
+        write_block(dir_block);
+    }
 }
 
 void init_fs(void) {
@@ -254,9 +271,9 @@ int do_mkfs(void) {
         write_buf(superblock.block_map_offset + i, 0);
 
     // create root dir
-    logging(LOG_MAN, "fs", "Creating root dir\n");
+    logging(LOG_MAN, "fs", "Creating root directory\n");
     current_ino = alloc_inode();
-    _mkdir(current_ino, current_ino);
+    _mkdentry(current_ino, current_ino, INODE_DIR);
 
     // write superblock
     write_superblock();
@@ -300,7 +317,7 @@ int do_cd(char *path) {
     if (path[strlen(path)-1] == '/')
         path[strlen(path)-1] = '\0';
 
-    int ino = parse_path(path, NULL, NULL);
+    int ino = path_lookup(path, NULL, NULL);
     logging(LOG_DEBUG, "fs", "... ino=0x%x\n", ino);
 
     if (ino == -1) {
@@ -308,19 +325,20 @@ int do_cd(char *path) {
         return -1;
     }
 
-    logging(LOG_INFO, "fs", "cd: current dir changed to \"%s\"\n", path);
+    logging(LOG_INFO, "fs", "cd: current directory changed to \"%s\"\n", path);
     current_ino = ino;
 
     return 0;  // do_cd succeeds
 }
 
-int do_mkdir(char *path) {
+int do_mkdentry(char *path, int tp) {
     pcb_t *self = current_running[get_current_cpu_id()];
-    logging(LOG_INFO, "fs", "%d.%s.%d do mkdir\n", self->pid, self->name, self->tid);
+    char *funcname = tp==INODE_DIR ? "mkdir" : "touch";
+    logging(LOG_INFO, "fs", "%d.%s.%d do %s\n", self->pid, self->name, self->tid, funcname);
     logging(LOG_DEBUG, "fs", "... path=\"%s\"\n", path);
 
     if (!is_fs_avaliable()) {
-        logging(LOG_ERROR, "fs", "mkdir: no file system found\n");
+        logging(LOG_ERROR, "fs", "%s: no file system found\n", funcname);
         return -1;
     }
 
@@ -329,36 +347,36 @@ int do_mkdir(char *path) {
 
     char *name;
     int pino;
-    int ino = parse_path(path, &name, &pino);
+    int ino = path_lookup(path, &name, &pino);
 
     // parent dir not found
     if (pino == -1) {
-        logging(LOG_ERROR, "fs", "mkdir: invalid path \"%s\"\n", path);
+        logging(LOG_ERROR, "fs", "%s: invalid path \"%s\"\n", funcname, path);
         return -1;
     }
     // name already exists
     if (ino != -1) {
-        logging(LOG_ERROR, "fs", "mkdir: \"%s\" already exists\n", ino==0 ? "/" : name);
+        logging(LOG_ERROR, "fs", "%s: \"%s\" already exists\n", funcname, ino==0 ? "/" : name);
         return -1;
     }
 
     // alloc new ino
     ino = alloc_inode();
     if (ino == -1) {
-        logging(LOG_ERROR, "fs", "mkdir: no free inode\n");
+        logging(LOG_ERROR, "fs", "%s: no free inode\n", funcname);
         return -1;
     }
 
     // find a invalid dentry and mkdir
     int success = 0;
-    logging(LOG_INFO, "fs", "... mkdir \"%s\" in inode=%d\n", name, pino);
+    logging(LOG_INFO, "fs", "... %s \"%s\" in inode=%d\n", funcname, name, pino);
     for (int i=0; i<DIRECT_BLOCK_NUM && !success; i++) {
         inode_t *inode = get_inode(pino);
         dentry_t *dentry;
         if (inode->direct_blocks[i] == -1) {
             // all blocks are full, alloc a new block
             inode->direct_blocks[i] = alloc_block();
-            logging(LOG_DEBUG, "fs", "... all direct blocks full, alloc a new one\n");
+            logging(LOG_VERBOSE, "fs", "... all direct blocks full, alloc a new one\n");
             inode->size += 4096;
             write_inode(pino);
             // clear the new block
@@ -367,10 +385,10 @@ int do_mkdir(char *path) {
         } else {
             dentry = (dentry_t *) get_block(inode->direct_blocks[i]);
         }
-        logging(LOG_DEBUG, "fs", "... searching direct_blocks[%d] at %d\n", i, inode->direct_blocks[i]);
+        logging(LOG_VERBOSE, "fs", "... searching direct_blocks[%d] at %d\n", i, inode->direct_blocks[i]);
         for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(dentry_t); j++) {
             if (!dentry[j].valid) {
-                logging(LOG_DEBUG, "fs", "... found empty entry at %d\n", j);
+                logging(LOG_VERBOSE, "fs", "... found empty entry at %d\n", j);
                 dentry[j].valid = 1;
                 dentry[j].ino = ino;
                 strcpy(dentry[j].name, name);
@@ -381,15 +399,20 @@ int do_mkdir(char *path) {
         }
     }
     if (success) {
-        _mkdir(ino, pino);
+        // make dentry
+        _mkdentry(ino, pino, tp);
+
         // write superblock
         write_superblock();
-
         return 0;  // do_mkdir succeeds
     } else {
         logging(LOG_ERROR, "fs", "mkdir failed\n");
         return -1;
     }
+}
+
+int do_mkdir(char *path) {
+    return do_mkdentry(path, INODE_DIR);
 }
 
 int do_rmdir(char *path) {
@@ -408,7 +431,7 @@ int do_rmdir(char *path) {
 
     char *name;
     int pino;
-    int ino = parse_path(path, &name, &pino);
+    int ino = path_lookup(path, &name, &pino);
     logging(LOG_DEBUG, "fs", "... ino=0x%x\n", ino);
 
     if (pino == -1 || ino == -1) {
@@ -418,10 +441,10 @@ int do_rmdir(char *path) {
 
     // root
     if (ino == 0) {
-        logging(LOG_ERROR, "fs", "rmdir: cannot remove root dir\n");
+        logging(LOG_ERROR, "fs", "rmdir: cannot remove root directory\n");
         return -1;
     }
-
+    // .
     if (strcmp(name, ".") == 0) {
         logging(LOG_ERROR, "fs", "rmdir: cannot remove \".\"\n");
         return -1;
@@ -430,13 +453,12 @@ int do_rmdir(char *path) {
     inode_t *inode = get_inode(ino);
     // not dir
     if (inode->type != INODE_DIR) {
-        logging(LOG_ERROR, "fs", "rmdir: file not empty\n");
+        logging(LOG_ERROR, "fs", "rmdir: is not directory\n");
         return -1;
     }
-
     // dir not empty
-    if (inode->link > 1) {
-        logging(LOG_ERROR, "fs", "rmdir: dir not empty\n");
+    if (inode->link > 2) {
+        logging(LOG_ERROR, "fs", "rmdir: directory not empty\n");
         return -1;
     }
 
@@ -466,6 +488,7 @@ int do_rmdir(char *path) {
         write_inode(pino);
 
         // remove ino's blocks
+        inode = get_inode(ino);
         for (int i=0; i<DIRECT_BLOCK_NUM; i++) {
             if (inode->direct_blocks[i] == -1)
                 break;
@@ -507,7 +530,7 @@ int do_ls(char *path, int option) {
     if (path[strlen(path)-1] == '/')
         path[strlen(path)-1] = '\0';
 
-    int ino = parse_path(path, NULL, NULL);
+    int ino = path_lookup(path, NULL, NULL);
     logging(LOG_DEBUG, "fs", "... ino=0x%x\n", ino);
 
     if (ino == -1) {
@@ -558,13 +581,7 @@ int do_ls(char *path, int option) {
 }
 
 int do_touch(char *path) {
-    if (!is_fs_avaliable()) {
-        logging(LOG_ERROR, "fs", "touch: no file system found\n");
-        return -1;
-    }
-    // TODO [P6-task2]: Implement do_touch
-
-    return 0;  // do_touch succeeds
+    return do_mkdentry(path, INODE_FILE);
 }
 
 int do_cat(char *path) {

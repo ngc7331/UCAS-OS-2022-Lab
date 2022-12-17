@@ -42,21 +42,30 @@ typedef struct dentry_t {
     int valid;
 } dentry_t;
 
-#define DIRECT_BLOCK_NUM 12
+#define DIRECT_BLOCK_NUM 8
+#define INDIRECT_BLOCK_L1_NUM 3
+#define INDIRECT_BLOCK_L2_NUM 2
+#define INDIRECT_BLOCK_L3_NUM 1
+
+#define INODE_FILE 0
+#define INODE_DIR  1
 typedef struct inode_t {
     // NOTE: BLOCK_SIZE_BYTE must be divisible by sizeof(this)
-    enum {
-        INODE_FILE,
-        INODE_DIR
-    } type;
-    int link;
+    short type;
+    short link;
     int size;
     int direct_blocks[DIRECT_BLOCK_NUM];
-    int indirect_block;
+    int indirect_blocks_l1[INDIRECT_BLOCK_L1_NUM];
+    int indirect_blocks_l2[INDIRECT_BLOCK_L2_NUM];
+    int indirect_blocks_l3[INDIRECT_BLOCK_L3_NUM];
 } inode_t;
 
 typedef struct fdesc_t {
     // TODO [P6-task2]: Implement the data structure of file descriptor
+    int ino;
+    int cur;
+    int size;
+    int mode;
 } fdesc_t;
 
 /* modes of do_fopen */
