@@ -1071,10 +1071,45 @@ int do_rm(char *path) {
             // remove ino's blocks
             inode = get_inode(ino);
             for (int i=0; i<DIRECT_BLOCK_NUM; i++) {
-                if (inode->direct_blocks[i] != -1)
-                    free_block(inode->direct_blocks[i]);
-                // TODO: support indirect blocks
+                if (inode->direct_blocks[i] == -1)
+                    continue;
+                free_block(inode->direct_blocks[i]);
             }
+            for (int i=0; i<INDIRECT_BLOCK_L1_NUM; i++) {
+                if (inode->indirect_blocks_l1[i] == -1)
+                    continue;
+                int *indirect_block = get_block(inode->indirect_blocks_l1[i]);
+                for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(int); j++) {
+                    if (indirect_block[j] == -1)
+                        continue;
+                    free_block(indirect_block[j]);
+                }
+                free_block(inode->indirect_blocks_l1[i]);
+            }
+            for (int i=0; i<INDIRECT_BLOCK_L2_NUM; i++) {
+                if (inode->indirect_blocks_l2[i] == -1)
+                    continue;
+                int *indirect_block = get_block(inode->indirect_blocks_l2[i]);
+                for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(int); j++) {
+                    if (indirect_block[j] == -1)
+                        continue;
+                    free_block(indirect_block[j]);
+                }
+                free_block(inode->indirect_blocks_l2[i]);
+            }
+            for (int i=0; i<INDIRECT_BLOCK_L3_NUM; i++) {
+                if (inode->indirect_blocks_l3[i] == -1)
+                    continue;
+                int *indirect_block = get_block(inode->indirect_blocks_l3[i]);
+                for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(int); j++) {
+                    if (indirect_block[j] == -1)
+                        continue;
+                    free_block(indirect_block[j]);
+                }
+                free_block(inode->indirect_blocks_l3[i]);
+            }
+
+            // FIXME: l2 & l3 blocks are not implemented due to block cache issue
 
             free_inode(ino);
 
