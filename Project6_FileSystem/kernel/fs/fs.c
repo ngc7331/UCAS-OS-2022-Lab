@@ -996,11 +996,38 @@ int do_rm(char *path) {
 }
 
 int do_lseek(int fd, int offset, int whence) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do lseek\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... fd=%d, offset=%d, whence=%d\n", fd, offset, whence);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "lseek: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_lseek
+
+    if (!check_fd(fd, "lseek")) {
+        return -1;
+    }
+
+    int new_wp, new_rp;
+    if (whence == SEEK_SET) {
+        new_wp = offset;
+        new_rp = offset;
+    } else if (whence == SEEK_CUR) {
+        new_wp = fdesc_array[fd].wp + offset;
+        new_rp = fdesc_array[fd].rp + offset;
+    } else if (whence == SEEK_END) {
+        inode_t *inode = get_inode(fdesc_array[fd].ino);
+        new_wp = inode->size + offset;
+        new_rp = inode->size + offset;
+    } else {
+        logging(LOG_ERROR, "fs", "lseek: invalid whence\n");
+        return -1;
+    }
+
+    logging(LOG_INFO, "fs", "... wp: %d->%d, rp: %d->%d\n", fdesc_array[fd].wp, new_wp, fdesc_array[fd].rp, new_rp);
+    fdesc_array[fd].wp = new_wp;
+    fdesc_array[fd].rp = new_rp;
 
     return 0;  // the resulting offset location from the beginning of the file
 }
