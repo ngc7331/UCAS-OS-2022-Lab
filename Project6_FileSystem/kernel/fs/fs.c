@@ -646,70 +646,43 @@ static int find_block(inode_t *inode, int block_no, int new_block) {
     }
 
     // indirect block
-    int addr_num_per_block = BLOCK_SIZE_BYTE/sizeof(int);
-    // l1
     block_no -= DIRECT_BLOCK_NUM;
-    int l1_blk_num = INDIRECT_BLOCK_L1_NUM * addr_num_per_block;
-    if (block_no < l1_blk_num) {
-        // find l1 block
-        int no = block_no / addr_num_per_block;
-        // ensure l1 block exist
-        if (inode->indirect_blocks_l1[no] == -1) {
-            if (new_block == -1)
-                return -1;
-            logging(LOG_VERBOSE, "fs", "... create new l1 indirect block\n");
-            int new_indirect_block = alloc_block();
-            inode->indirect_blocks_l1[no] = new_indirect_block;
-            int *indirect_block = (int *) get_block(new_indirect_block);
-            for (int i=0; i<addr_num_per_block; i++)
-                indirect_block[i] = -1;
-            write_block(new_indirect_block);
+    int addr_num_per_block = BLOCK_SIZE_BYTE/sizeof(int);
+    int lx_size[3] = {
+        addr_num_per_block,
+        addr_num_per_block * addr_num_per_block,
+        addr_num_per_block * addr_num_per_block * addr_num_per_block
+    };
+    int lx_blk_num[3] = {
+        INDIRECT_BLOCK_L1_NUM * lx_size[0],
+        INDIRECT_BLOCK_L2_NUM * lx_size[1],
+        INDIRECT_BLOCK_L3_NUM * lx_size[2]
+    };
+    int *indirect_blocks_lx[3] = {
+        inode->indirect_blocks_l1,
+        inode->indirect_blocks_l2,
+        inode->indirect_blocks_l3
+    };
+    for (int level=0; level<3; level++) {
+        if (block_no < lx_blk_num[level]) {
+            // fine top level block
+            int no = block_no / lx_size[level];
+            // ensure top level block
+            if (indirect_blocks_lx[level][no] == -1) {
+                if (new_block == -1)
+                    return -1;
+                int new_indirect_block = alloc_block();
+                indirect_blocks_lx[level][no] = new_indirect_block;
+                int *indirect_block = (int *) get_block(new_indirect_block);
+                for (int i=0; i<addr_num_per_block; i++)
+                    indirect_block[i] = -1;
+                write_block(new_indirect_block);
+                logging(LOG_VERBOSE, "fs", "... create new l%d indirect block at %d\n", level+1, new_indirect_block);
+            }
+            logging(LOG_VERBOSE, "fs", "... find l%d indirect block\n", level+1);
+            return find_indirect_block(indirect_blocks_lx[level][no], block_no % lx_size[level], level, new_block);
         }
-        logging(LOG_VERBOSE, "fs", "... find l1 indirect block no=%d\n");
-        // find block and return
-        return find_indirect_block(inode->indirect_blocks_l1[no], block_no % addr_num_per_block, 0, new_block);
-    }
-    block_no -= l1_blk_num;
-    int l2_blk_num = INDIRECT_BLOCK_L2_NUM * addr_num_per_block * addr_num_per_block;
-    if (block_no < l2_blk_num) {
-        // find l2 block
-        int no = block_no / (addr_num_per_block * addr_num_per_block);
-        // ensure l2 block exist
-        if (inode->indirect_blocks_l2[no] == -1) {
-            if (new_block == -1)
-                return -1;
-            logging(LOG_VERBOSE, "fs", "... create new l2 indirect block\n");
-            int new_indirect_block = alloc_block();
-            inode->indirect_blocks_l2[no] = new_indirect_block;
-            int *indirect_block = (int *) get_block(new_indirect_block);
-            for (int i=0; i<addr_num_per_block; i++)
-                indirect_block[i] = -1;
-            write_block(new_indirect_block);
-        }
-        logging(LOG_VERBOSE, "fs", "... find l2 indirect block no=%d\n");
-        // find block and return
-        return find_indirect_block(inode->indirect_blocks_l2[no], block_no % (addr_num_per_block * addr_num_per_block), 1, new_block);
-    }
-    block_no -= l2_blk_num;
-    int l3_blk_num = INDIRECT_BLOCK_L3_NUM * addr_num_per_block * addr_num_per_block * addr_num_per_block;
-    if (block_no < l3_blk_num) {
-        // find l3 block
-        int no = block_no / (addr_num_per_block * addr_num_per_block * addr_num_per_block);
-        // ensure l3 block exist
-        if (inode->indirect_blocks_l3[no] == -1) {
-            if (new_block == -1)
-                return -1;
-            logging(LOG_VERBOSE, "fs", "... create new l3 indirect block\n");
-            int new_indirect_block = alloc_block();
-            inode->indirect_blocks_l3[no] = new_indirect_block;
-            int *indirect_block = (int *) get_block(new_indirect_block);
-            for (int i=0; i<addr_num_per_block; i++)
-                indirect_block[i] = -1;
-            write_block(new_indirect_block);
-        }
-        // find block and return
-        logging(LOG_VERBOSE, "fs", "... find l3 indirect block no=%d\n");
-        return find_indirect_block(inode->indirect_blocks_l3[no], block_no % (addr_num_per_block * addr_num_per_block * addr_num_per_block), 2, new_block);
+        block_no -= lx_blk_num[level];
     }
 
     // out of range
