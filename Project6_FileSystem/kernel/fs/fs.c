@@ -783,12 +783,9 @@ int do_fwrite(int fd, char *buff, int length) {
             int new_block = alloc_block();
             if (new_block == -1) {
                 logging(LOG_ERROR, "fs", "fwrite: no free block\n");
-                inode->size = max(fdesc_array[fd].wp, inode->size);
-                write_inode(fdesc_array[fd].ino);
-                return length - remain;
+                break;
             }
             inode->direct_blocks[block_no] = new_block;
-            write_inode(fdesc_array[fd].ino);
             logging(LOG_DEBUG, "fs", "... alloc block %d for inode %d\n", new_block, fdesc_array[fd].ino);
         }
         // write data to block
@@ -810,7 +807,9 @@ int do_fwrite(int fd, char *buff, int length) {
     inode->size = max(fdesc_array[fd].wp, inode->size);
     write_inode(fdesc_array[fd].ino);
 
-    return length;  // return the length of trully written data
+    write_superblock();
+
+    return remain < 0 ? length : length - remain;  // return the length of trully written data
 }
 
 int do_fclose(int fd) {
