@@ -62,7 +62,8 @@ typedef struct inode_t {
 
 typedef struct fdesc_t {
     int ino;
-    int cur;
+    int wp;
+    int rp;
     int mode;
     pid_t owner;
 } fdesc_t;

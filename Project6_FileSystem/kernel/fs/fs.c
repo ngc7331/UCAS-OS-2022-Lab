@@ -1,5 +1,6 @@
 #include <os/kernel.h>
 #include <os/loader.h>
+#include <os/mm.h>
 #include <os/sched.h>
 #include <os/smp.h>
 #include <os/string.h>
@@ -7,6 +8,9 @@
 #include <printk.h>
 
 #define PRINT_ALIGN 8
+
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
 
 static superblock_t superblock;
 static fdesc_t fdesc_array[NUM_FDESCS];
@@ -222,6 +226,10 @@ void init_fs(void) {
         logging(LOG_WARNING, "init", "No fs found on disk, run mkfs\n");
         do_mkfs();
     }
+
+    // init fdesc_array
+    for (int i=0; i<NUM_FDESCS; i++)
+        fdesc_array[i].ino = -1;
 
     // if fs loaded, root dir's ino must bt 0
     current_ino = 0;
@@ -589,7 +597,33 @@ int do_cat(char *path) {
         logging(LOG_ERROR, "fs", "cat: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_cat
+
+    int ino = path_lookup(path, NULL, NULL);
+    if (ino == -1) {
+        logging(LOG_ERROR, "fs", "cat: path not found\n");
+        return -1;
+    }
+
+    inode_t *inode = get_inode(ino);
+    int remain = inode->size;
+    int block_no = 0;
+
+    while (remain > 0) {
+        if (inode->direct_blocks[block_no] == -1) {
+            logging(LOG_WARNING, "fs", "... no more block to read\n");
+            break;
+        }
+        char *block = get_block(inode->direct_blocks[block_no]);
+        int len = remain > PAGE_SIZE ? PAGE_SIZE : remain;
+        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, inode->direct_blocks[block_no]);
+
+        for (int i=0; i<len; i++)
+            printk("%c", block[i]);
+
+        block_no += 1;
+        remain -= BLOCK_SIZE_BYTE;
+    }
+    printk("\n");
 
     return 0;  // do_cat succeeds
 }
@@ -609,10 +643,18 @@ int do_fopen(char *path, int mode) {
         return -1;
     }
 
-    int ino = path_lookup(path, NULL, NULL);
+    int pino;
+    int ino = path_lookup(path, NULL, &pino);
     if (ino == -1) {
-        logging(LOG_ERROR, "fs", "fopen: path not found\n");
-        return -1;
+        // file not found
+        // a) parent dir exists and open allowing write -> try create file
+        // b) else -> fail
+        if (pino != -1 && (mode == O_RDWR || mode == O_WRONLY) && do_touch(path) == 0) {
+            ino = path_lookup(path, NULL, NULL);
+        } else {
+            logging(LOG_ERROR, "fs", "fopen: path not found\n");
+            return -1;
+        }
     }
 
     inode_t *inode = get_inode(ino);
@@ -631,7 +673,8 @@ int do_fopen(char *path, int mode) {
     for (int i=0; i<NUM_FDESCS; i++) {
         if (fdesc_array[i].ino == -1) {
             fdesc_array[i].ino = ino;
-            fdesc_array[i].cur = 0;
+            fdesc_array[i].wp = 0;
+            fdesc_array[i].rp = 0;
             fdesc_array[i].mode = mode;
             fdesc_array[i].owner = self->pid;
             logging(LOG_INFO, "fs", "... fd=%d\n", i);
@@ -643,24 +686,127 @@ int do_fopen(char *path, int mode) {
     return -1;
 }
 
+static int check_fd(int fd, char *funcname) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    if (fd < 0 || fd >= NUM_FDESCS) {
+        logging(LOG_ERROR, "fs", "%s: invalid fd\n", funcname);
+        return 0;
+    }
+    if (fdesc_array[fd].ino == -1) {
+        logging(LOG_ERROR, "fs", "%s: fd not opened\n", funcname);
+        return 0;
+    }
+    if (fdesc_array[fd].owner != self->pid) {
+        logging(LOG_ERROR, "fs", "%s: fd not owned by current process\n", funcname);
+        return 0;
+    }
+    return 1;
+}
+
 int do_fread(int fd, char *buff, int length) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do fread\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... fd=%d, buff=0x%x, len=%d\n", fd, (uint64_t) buff, length);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "fread: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_fread
 
-    return 0;  // return the length of trully read data
+    if (!check_fd(fd, "fread")) {
+        return -1;
+    }
+
+    if (fdesc_array[fd].mode == O_WRONLY) {
+        logging(LOG_ERROR, "fs", "fread: fd not opened for reading\n");
+        return -1;
+    }
+
+    int remain = length;
+    int block_no = fdesc_array[fd].rp / BLOCK_SIZE_BYTE;
+    int offset = fdesc_array[fd].rp % BLOCK_SIZE_BYTE;
+    inode_t *inode = get_inode(fdesc_array[fd].ino);
+
+    while (remain > 0) {
+        if (inode->direct_blocks[block_no] == -1) {
+            logging(LOG_WARNING, "fs", "... no more block to read\n");
+            return length - remain;
+        }
+        char *block = get_block(inode->direct_blocks[block_no]);
+        int len = remain > BLOCK_SIZE_BYTE - offset ? BLOCK_SIZE_BYTE - offset : remain;
+        memcpy((uint8_t *) buff, (uint8_t *) block + offset, len);
+        logging(LOG_DEBUG, "fs", "... read %d bytes from block %d\n", len, inode->direct_blocks[block_no]);
+
+        block_no += 1;
+        buff += len;
+        fdesc_array[fd].rp += len;
+        remain -= BLOCK_SIZE_BYTE - offset;
+        offset = 0;
+    }
+
+    // TODO: support indirect blocks
+
+    return length;  // return the length of trully read data
 }
 
 int do_fwrite(int fd, char *buff, int length) {
+    pcb_t *self = current_running[get_current_cpu_id()];
+    logging(LOG_INFO, "fs", "%d.%s.%d do fwrite\n", self->pid, self->name, self->tid);
+    logging(LOG_DEBUG, "fs", "... fd=%d, buff=0x%x, len=%d\n", fd, (uint64_t) buff, length);
+
     if (!is_fs_avaliable()) {
         logging(LOG_ERROR, "fs", "fwrite: no file system found\n");
         return -1;
     }
-    // TODO [P6-task2]: Implement do_fwrite
 
-    return 0;  // return the length of trully written data
+    if (!check_fd(fd, "fwrite")) {
+        return -1;
+    }
+
+    if (fdesc_array[fd].mode == O_RDONLY) {
+        logging(LOG_ERROR, "fs", "fwrite: fd not opened for writing\n");
+        return -1;
+    }
+
+    int remain = length;
+    int block_no = fdesc_array[fd].wp / BLOCK_SIZE_BYTE;
+    int offset = fdesc_array[fd].wp % BLOCK_SIZE_BYTE;
+    inode_t *inode = get_inode(fdesc_array[fd].ino);
+
+    while (remain > 0) {
+        if (inode->direct_blocks[block_no] == -1) {
+            // new block needed
+            int new_block = alloc_block();
+            if (new_block == -1) {
+                logging(LOG_ERROR, "fs", "fwrite: no free block\n");
+                inode->size = max(fdesc_array[fd].wp, inode->size);
+                write_inode(fdesc_array[fd].ino);
+                return length - remain;
+            }
+            inode->direct_blocks[block_no] = new_block;
+            write_inode(fdesc_array[fd].ino);
+            logging(LOG_DEBUG, "fs", "... alloc block %d for inode %d\n", new_block, fdesc_array[fd].ino);
+        }
+        // write data to block
+        char *block = get_block(inode->direct_blocks[block_no]);
+        int len = remain > BLOCK_SIZE_BYTE - offset ? BLOCK_SIZE_BYTE - offset : remain;
+        memcpy((uint8_t *) (block + offset), (uint8_t *) buff, len);
+        write_block(inode->direct_blocks[block_no]);
+        logging(LOG_DEBUG, "fs", "... write %d bytes to block %d\n", len, inode->direct_blocks[block_no]);
+
+        block_no += 1;
+        buff += len;
+        fdesc_array[fd].wp += len;
+        remain -= BLOCK_SIZE_BYTE - offset;
+        offset = 0;
+    }
+
+    // TODO: support indirect blocks
+
+    inode->size = max(fdesc_array[fd].wp, inode->size);
+    write_inode(fdesc_array[fd].ino);
+
+    return length;  // return the length of trully written data
 }
 
 int do_fclose(int fd) {
@@ -673,16 +819,7 @@ int do_fclose(int fd) {
         return -1;
     }
 
-    if (fd < 0 || fd >= NUM_FDESCS) {
-        logging(LOG_ERROR, "fs", "fclose: invalid fd\n");
-        return -1;
-    }
-    if (fdesc_array[fd].ino == -1) {
-        logging(LOG_ERROR, "fs", "fclose: fd not opened\n");
-        return -1;
-    }
-    if (fdesc_array[fd].owner != self->pid) {
-        logging(LOG_ERROR, "fs", "fclose: fd not owned by current process\n");
+    if (!check_fd(fd, "fclose")) {
         return -1;
     }
 

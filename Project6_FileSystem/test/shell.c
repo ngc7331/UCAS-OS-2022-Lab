@@ -163,13 +163,19 @@ int main(void) {
         } while (*pbuf);
 
         // commands
-        // TODO [P6-task2]: touch, cat, ln, ls -l, rm
+        // TODO [P6-task2]: ln, rm
         if (strcmp("cd", argv[0]) == 0) {
             if (argc == 1) {
                 printf("Error: path can't be empty\nUsage: cd path\n");
                 continue;
             }
             sys_cd(argv[1]);
+        } else if (strcmp("cat", argv[0]) == 0) {
+            if (argc == 1) {
+                printf("Error: path can't be empty\nUsage: cat path\n");
+                continue;
+            }
+            sys_cat(argv[1]);
         } else if (strcmp("clear", argv[0]) == 0) {
             init_shell();
         } else if (strcmp("exec", argv[0]) == 0) {
