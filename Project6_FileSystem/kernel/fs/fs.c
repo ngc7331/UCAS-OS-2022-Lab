@@ -141,7 +141,7 @@ static int path_lookup(char *path, char **name, int *pino) {
                     break;
                 dentry_t *dentry = (dentry_t *) get_block(inode->direct_blocks[i]);
                 for (int j=0; j<BLOCK_SIZE_BYTE/sizeof(dentry_t); j++) {
-                    if (dentry[j].valid && strncmp(dentry[j].name, pp, len-1) == 0) {
+                    if (dentry[j].valid && strncmp(dentry[j].name, pp, len-1) == 0 && strlen(dentry[j].name) == len) {
                         logging(LOG_VERBOSE, "fs", "found entry=%s path=%s len=%d, ino=%d\n",
                                 dentry[j].name, pp, len, dentry[j].ino);
                         ino = dentry[j].ino;
