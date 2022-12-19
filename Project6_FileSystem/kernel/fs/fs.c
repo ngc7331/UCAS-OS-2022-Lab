@@ -702,6 +702,12 @@ int do_cat(char *path) {
     }
 
     inode_t *inode = get_inode(ino);
+
+    if (inode->type != INODE_FILE) {
+        logging(LOG_ERROR, "fs", "cat: not a file\n");
+        return -1;
+    }
+
     int remain = inode->size;
     int block_no = 0;
 
