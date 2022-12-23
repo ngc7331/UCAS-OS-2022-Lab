@@ -23,6 +23,7 @@
   - [间址块的支持](#间址块的支持)
     - [`find_indirect_block`](#find_indirect_block)
     - [`find_block`](#find_block)
+  - [关于测试程序的一点疑问](#关于测试程序的一点疑问)
 
 
 ## 文件系统概况
@@ -182,3 +183,93 @@ cat 的实现和读取十分相似，只是：其读取长度由文件大小确�
 输入参数为“本文件的第几个 block”，即`offset/BLOCK_SIZE_BYTE`，依次在直接索引块、一至三级间接索引块中查找。间接索引块的查找是通过调用`find_indirect_block`实现的。当直接索引块、一至三级间接索引块不存在时，且`new_block`不为`-1`时创建不存在的块，并将编号填入 inode
 
 有了这两个函数，只需在使用时调用`bno = find_block(offset/BLOCK_SIZE_BYTE);`即可得到 block 的编号
+
+## 关于测试程序的一点疑问
+关于现在的 test_project6/rwfile.c 文件，其内容：
+```
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+static char buff[64];
+
+int main(void)
+{
+    int fd = sys_fopen("1.txt", O_RDWR);
+
+    // write 'hello world!' * 10
+    for (int i = 0; i < 10; i++)
+    {
+        sys_fwrite(fd, "hello world!\n", 13);
+    }
+
+    // read
+    for (int i = 0; i < 10; i++)
+    {
+        sys_fread(fd, buff, 13);
+        for (int j = 0; j < 13; j++)
+        {
+            printf("%c", buff[j]);
+        }
+    }
+
+    sys_fclose(fd);
+
+    return 0;
+}
+```
+为打开`1.txt`，写入10次"hello world!\n"，再读取10次并打印出来，最后关闭文件。其期望输出为10行 hello world!
+
+但在完成任务中我其实产生了一个疑问：这是否要求文件描述符拥有读、写两个指针？
+
+根据我对 xv6 源码的理解，其实现中仅使用了一个指针，读、写时共享。而 Linux 也应当采用了类似的方法
+
+我在 Linux 环境下复现了上述测试代码如下：
+```
+#include <stdio.h>
+int main() {
+    FILE *fd = fopen("test.txt", "w+");
+    for (int i=0; i<10; i++)
+        fwrite("hello world!\n", 1, 13, fd);
+    char buff[100];
+    for (int i=0; i<10; i++) {
+        fread(buff, 1, 13, fd);
+        printf("%s", buff);
+    }
+    fclose(fd);
+    return 0;
+}
+```
+其输出结果为空，这证实了我的猜测：读写共用一个指针，写入完成时文件如下：
+```
+ 1 hello world!
+   ...
+10 hello world!
+11                <- off
+```
+
+而不是
+```
+ 1 hello world!   <- rp
+   ...
+10 hello world!
+11                <- wp
+```
+
+与此同时，若确实使用两个指针（这也是我目前的解决方法），在`lseek`以`SEEK_CUR`模式执行时，是否读、写指针同时移动`offset`？这样感觉并不十分合理
+
+我认为 xv6 和 Linux 的实现是更加符合直觉的，这样的话，测试程序`rwfile`应作修改如下：
+
+在10次写入和10次读取的 for 循环之间增加关闭重新打开文件的代码：
+```
+...
+    } // write
+
+    sys_fclose(fd);
+    fd = sys_fopen("1.txt", O_RDONLY);
+
+    // read
+...
+```
+
+或者将 lseek 作为必选内容，使用`lseek(fd, 0, SEEK_SET);`
